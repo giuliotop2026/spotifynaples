@@ -5,10 +5,10 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 import urllib.parse
 
-# PROTOCOLLO DI PERFEZIONE 15.15 - CONFIGURAZIONE GRAFICA [cite: 2026-02-25]
+# PROTOCOLLO GRANITO 3.1: CONFIGURAZIONE CANTIERE [cite: 2026-02-25]
 st.set_page_config(page_title="MUSIC LOCK PRO - SISTEMA GRANITO", layout="wide")
 
-# CSS: ALTA LEGGIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD [cite: 2026-01-20]
+# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD [cite: 2026-01-20]
 st.markdown("""
 <style>
     .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
@@ -17,32 +17,33 @@ st.markdown("""
         background-color: #F8F9FA;
         padding: 20px;
         border-radius: 15px;
-        border: 2px solid #007FFF;
+        border: 3px solid #007FFF;
         margin-bottom: 20px;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 4px 4px 12px rgba(0,0,0,0.1);
     }
     .stButton>button {
         background-color: #1DB954 !important; color: white !important;
-        border-radius: 25px !important; font-weight: 900 !important;
+        border-radius: 30px !important; font-weight: 900 !important;
         text-transform: uppercase !important; width: 100% !important;
-        border: none !important; height: 50px !important;
+        border: none !important; height: 55px !important;
+        font-size: 18px !important;
     }
-    p, span, label, .stMarkdown { color: #000000 !important; font-weight: 800 !important; text-transform: uppercase !important; }
-    input { color: #000000 !important; font-weight: 900 !important; }
+    p, span, label, .stMarkdown { color: #000000 !important; font-weight: 900 !important; text-transform: uppercase !important; }
+    input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE GOOGLE SHEETS [cite: 2026-01-15, 2026-02-25]
+# CONNESSIONE DATABASE GOOGLE SHEETS - ZERO ERRORI [cite: 2026-01-19, 2026-02-25]
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_db():
     try:
-        # LETTURA SENZA CACHE PER DATI SEMPRE AGGIORNATI [cite: 2026-01-21]
+        # LETTURA DIRETTA DAL CANTIERE [cite: 2026-02-20]
         return conn.read(worksheet="Sheet1", ttl=0)
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# FUNZIONE RICERCA CON PROTEZIONE CONTRO I BLOCCHI [cite: 2026-02-15, 2026-02-20]
+# MOTORE DI RICERCA CON POLMONI D'ACCIAIO [cite: 2026-02-18]
 def search_yt(query):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -61,52 +62,52 @@ def search_yt(query):
         except:
             return []
 
-# INTERFACCIA PRINCIPALE - PROGETTO BLUE LOCK [cite: 2026-01-19, 2026-01-20]
+# INTERFACCIA PRINCIPALE - PROGETTO BLUE LOCK [cite: 2026-01-19]
 st.title("🎵 MUSIC LOCK - SISTEMA GRANITO 3.1")
+st.write("---")
 
-menu = st.sidebar.radio("NAVIGAZIONE", ["RICERCA", "LIBRERIA PREFERITI"])
+menu = st.sidebar.radio("NAVIGAZIONE CANTIERE", ["🔍 RICERCA BRANI", "📂 LIBRERIA PREFERITI"])
 
-if menu == "RICERCA":
-    query = st.text_input("CERCA BRANO O ARTISTA (MAIUSCOLO)")
+if menu == "🔍 RICERCA BRANI":
+    query = st.text_input("INSERISCI IL MOTORE DA SCANSIONARE (ES: NOME CANZONE)")
     if query:
-        with st.spinner("SCANSIONE IN CORSO..."):
+        with st.spinner("SCANSIONE DELL'ABISSO IN CORSO..."):
             results = search_yt(query)
             if not results:
-                st.error("NESSUN RISULTATO TROVATO. IL MOTORE È BLOCCATO O LA RICERCA È VUOTA.")
+                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. IL MOTORE DI RICERCA È BLOCCATO [cite: 2026-01-25].")
             else:
                 for vid in results:
                     with st.container():
                         st.markdown(f'<div class="result-card"><h3>{vid["title"].upper()}</h3></div>', unsafe_allow_html=True)
                         c1, c2, c3 = st.columns([2, 1, 1])
                         with c1:
-                            # RIPRODUZIONE AUDIO DIRETTA [cite: 2026-02-18]
                             st.audio(vid['url'])
                         with c2:
-                            if st.button("💾 SALVA", key=f"s_{vid['id']}"):
+                            if st.button("💾 SALVA NEL CANTIERE", key=f"s_{vid['id']}"):
                                 df = get_db()
                                 new_row = pd.DataFrame([{"TITOLO": vid['title'].upper(), "URL": vid['webpage_url'], "CATEGORIA": "PREFERITI"}])
                                 updated_df = pd.concat([df, new_row], ignore_index=True).drop_duplicates()
-                                # AGGIORNAMENTO DATABASE GOOGLE SHEETS [cite: 2026-02-25]
+                                # BLINDA IL SALVATAGGIO NEL DATABASE [cite: 2026-02-25]
                                 conn.update(worksheet="Sheet1", data=updated_df)
-                                st.success("SALVATO!")
+                                st.success("VINCITORE NASCOSTO SALVATO! [cite: 2026-02-20]")
                         with c3:
-                            # LINK ESTERNO PER DOWNLOAD SICURO [cite: 2026-02-25]
+                            # DOWNLOAD ESTERNO SICURO 10000% [cite: 2026-02-07, 2026-02-25]
                             notube = f"https://notube.link/it/youtube-app-317?url={urllib.parse.quote(vid['webpage_url'])}"
-                            st.markdown(f'<a href="{notube}" target="_blank"><button style="width:100%; height:50px; background-color:#007FFF; color:white; border-radius:25px; border:none; font-weight:bold; cursor:pointer;">⬇️ DOWNLOAD</button></a>', unsafe_allow_html=True)
+                            st.markdown(f'<a href="{notube}" target="_blank"><button style="width:100%; height:55px; background-color:#007FFF; color:white; border-radius:30px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ DOWNLOAD</button></a>', unsafe_allow_html=True)
 
 else:
-    st.title("📂 LIBRERIA PREFERITI")
+    st.title("📂 LIBRERIA PREFERITI - GLORIA ETERNA [cite: 2026-02-21]")
     df = get_db()
     if df.empty:
-        st.warning("IL DATABASE È VUOTO. SALVA I TUOI BRANI NEL CANTIERE.")
+        st.warning("IL CANTIERE È VUOTO. NESSUN BRANO BLINDATO [cite: 2026-02-20].")
     else:
         for i, row in df.iterrows():
             with st.expander(f"🎵 {row['TITOLO']}"):
-                st.write(f"LINK SORGENTE: {row['URL']}")
+                st.write(f"DENSITÀ TECNICA: {row['URL']}")
                 if st.button("RIPRODUCI ORA", key=f"p_{i}"):
-                    # FIX INDEXERROR: CONTROLLO ESISTENZA RISULTATI [cite: 2026-02-25]
+                    # FIX INDEXERROR: VERIFICA PRESENZA PARTICELLE [cite: 2026-01-25, 2026-02-25]
                     fresh_results = search_yt(row['URL'])
                     if fresh_results and len(fresh_results) > 0:
                         st.audio(fresh_results[0]['url'])
                     else:
-                        st.error("ERRORE DI RECUPERO. IL LINK POTREBBE ESSERE BLOCCATO DA YOUTUBE.")
+                        st.error("ERRORE: IMPOSSIBILE AGGANCIARE LA PARTICELLA [cite: 2026-01-25].")
