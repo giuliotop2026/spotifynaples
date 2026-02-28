@@ -3,172 +3,158 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 
-# PROTOCOLLO GRANITO 27.0: CLONE TOTALE E MOTORE DI EMERGENZA [cite: 2026-02-25]
+# PROTOCOLLO GRANITO 28.0: CATEGORIE DINAMICHE E DESIGN ZERO-DISTURBO
 st.set_page_config(page_title="SIMPATIC-MUSIC", layout="wide", initial_sidebar_state="expanded")
 
-# CSS: L'ANIMA VISIVA DI SPOTIFY - ZERO ERRORI, SOLO CEMENTO [cite: 2026-01-20, 2026-02-25]
+# CSS: L'EVOLUZIONE DEFINITIVA - PULIZIA TOTALE
 st.markdown("""
 <style>
-    .stApp { background-color: #000000 !important; color: #FFFFFF !important; }
+    .stApp { background-color: #121212 !important; color: #FFFFFF !important; }
     [data-testid="stSidebar"] { background-color: #000000 !important; border-right: 1px solid #121212; }
     
-    /* SIDEBAR: PULSANTI TIPO APP NATIVA */
-    .stSidebar [data-testid="stVerticalBlock"] button {
-        background-color: transparent !important; color: #b3b3b3 !important;
-        border: none !important; text-align: left !important; justify-content: flex-start !important;
-        font-size: 16px !important; font-weight: 700 !important; padding: 10px 0px !important;
-    }
-    .stSidebar [data-testid="stVerticalBlock"] button:hover { color: #FFFFFF !important; }
-    
-    /* TITOLI SEZIONI */
-    .section-title { font-size: 24px; font-weight: 800; color: white; margin: 25px 0 15px 0; }
+    .section-title { font-size: 26px; font-weight: 800; color: white; margin: 30px 0 15px 0; border-left: 5px solid #1DB954; padding-left: 15px; }
     .spotify-green { color: #1DB954 !important; }
 
-    /* GRID CARDS (HOME PAGE) */
+    /* CARD DELLA HOME PAGE - INTEGRATA */
     .grid-card {
         background-color: #181818; padding: 15px; border-radius: 8px;
-        transition: 0.3s; height: 100%; cursor: pointer;
+        transition: 0.3s; height: 100%; border: 1px solid transparent;
     }
     .grid-card:hover { background-color: #282828; }
-    .img-square { border-radius: 6px; width: 100%; aspect-ratio: 1; object-fit: cover; margin-bottom: 12px; }
-    .img-circle { border-radius: 50%; width: 100%; aspect-ratio: 1; object-fit: cover; margin-bottom: 12px; }
-    .card-title { color: white; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .img-square { border-radius: 6px; width: 100%; aspect-ratio: 1; object-fit: cover; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+    .card-title { color: white; font-weight: 700; font-size: 15px; margin-top: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-artist { color: #A7A7A7; font-size: 13px; margin-top: 4px; }
 
-    /* LISTA BRANI (LIBRERIA E CERCA) */
-    .track-row { padding: 8px 12px; border-radius: 4px; display: flex; align-items: center; transition: 0.2s; }
-    .track-row:hover { background-color: rgba(255,255,255,0.1); }
-    
-    /* PULSANTI AZIONE (PLAY/SALVA) */
-    .btn-pill button {
-        background-color: #1DB954 !important; color: black !important;
-        border-radius: 50px !important; border: none !important;
-        font-weight: 700 !important; height: 35px !important;
+    /* RIMOZIONE "COSI BIANCHI" - PULSANTI INVISIBILI O VERDI NATIVI */
+    .stButton>button { 
+        background-color: #1DB954 !important; color: black !important; 
+        border-radius: 50px !important; font-weight: 800 !important; 
+        border: none !important; width: 45px !important; height: 45px !important;
+        margin-top: -50px !important; margin-left: auto !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3) !important;
+        font-size: 18px !important;
     }
-    .btn-pill button:hover { transform: scale(1.04); background-color: #1ed760 !important; }
+    .stButton>button:hover { transform: scale(1.1) !important; background-color: #1ed760 !important; }
     
-    /* SEARCH BAR NATIVA */
-    input { background-color: #242424 !important; color: white !important; border-radius: 500px !important; border: 1px solid transparent !important; }
-    input:focus { border-color: #FFFFFF !important; }
+    /* FIX PER LIBRERIA E CERCA */
+    .track-row { padding: 10px; border-radius: 8px; transition: 0.2s; border: 1px solid transparent; }
+    .track-row:hover { background-color: #282828; border-color: #1DB954; }
+    
+    input { background-color: #242424 !important; color: white !important; border-radius: 500px !important; border: 1px solid #1DB954 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 ytmusic = YTMusic()
 
-# SESSIONE [cite: 2026-02-25]
 if 'current_view' not in st.session_state: st.session_state.current_view = "🏠 HOME"
 if 'current_url' not in st.session_state: st.session_state.current_url = None
-if 'track_idx' not in st.session_state: st.session_state.track_idx = 0
+if 'home_genre' not in st.session_state: st.session_state.home_genre = "HIT DEL MOMENTO"
 
 def get_db():
     try: return conn.read(ttl=0)
     except: return pd.DataFrame(columns=["TITOLO", "URL", "COPERTINA"])
 
-def get_home_content():
-    # MOTORE DI EMERGENZA: SE CHARTS FALLISCE, CERCA HIT GENERICHE [cite: 2026-02-25]
+# MOTORE DI RICERCA CATEGORIE
+@st.cache_data(ttl=3600)
+def get_genre_hits(genre):
     try:
-        charts = ytmusic.get_charts(country='IT')
-        if charts and 'trending' in charts: return charts
-    except: pass
-    
-    # FALLBACK: SCANSIONE ABISSO PER HIT 2026 [cite: 2026-02-20]
-    try:
-        emergency_search = ytmusic.search("Top Hits 2026 Italy", filter="songs", limit=10)
-        return {'trending': {'items': emergency_search}, 'videos': {'items': []}}
-    except: return None
+        if genre == "HIT DEL MOMENTO":
+            charts = ytmusic.get_charts(country='IT')
+            return charts['trending']['items'] if charts else []
+        else:
+            return ytmusic.search(f"Top {genre} 2026", filter="songs", limit=10)
+    except: return []
 
-# --- SIDEBAR (PULITA COME SPOTIFY) ---
+# --- SIDEBAR (PULITA E PROFESSIONALE) ---
 with st.sidebar:
     st.markdown("## <span class='spotify-green'>SIMPATIC</span> MUSIC", unsafe_allow_html=True)
-    st.write("")
+    st.write("---")
     if st.button("🏠 Home"): st.session_state.current_view = "🏠 HOME"; st.rerun()
     if st.button("🔍 Cerca"): st.session_state.current_view = "🔍 CERCA"; st.rerun()
     if st.button("🎧 La tua libreria"): st.session_state.current_view = "🎧 LIBRERIA"; st.rerun()
+    st.write("---")
+    st.markdown("### 🏷️ GENERI")
+    for g in ["ROCK", "JAZZ", "WESTERN", "NAPOLI", "ANNI 80"]:
+        if st.button(f"🎵 {g}"):
+            st.session_state.home_genre = g
+            st.session_state.current_view = "🏠 HOME"
+            st.rerun()
 
 df = get_db()
 
-# --- PLAYER SUPREMO (SEMPRE IN ALTO SE ATTIVO) ---
+# --- PLAYER FISSO IN ALTO ---
 if st.session_state.current_url:
     st.video(st.session_state.current_url)
-    if st.button("⏹ STOP"): st.session_state.current_url = None; st.rerun()
+    if st.button("⏹ CHIUDI PLAYER"): st.session_state.current_url = None; st.rerun()
     st.write("---")
 
-# === VISTA: HOME (L'ANIMA DI SPOTIFY) ===
+# === VISTA: HOME (IL CUORE DEL CANTIERE) ===
 if st.session_state.current_view == "🏠 HOME":
-    st.markdown('<div class="section-title">Brani di tendenza</div>', unsafe_allow_html=True)
-    content = get_home_content()
+    st.markdown(f'<div class="section-title">{st.session_state.home_genre}</div>', unsafe_allow_html=True)
+    items = get_genre_hits(st.session_state.home_genre)
     
-    if content and 'trending' in content:
-        cols = st.columns(5)
-        items = content['trending'].get('items', [])
-        for i, item in enumerate(items[:5]):
-            with cols[i]:
-                thumb = item['thumbnails'][-1]['url']
-                title = item['title']
-                artist = item['artists'][0]['name'] if item.get('artists') else "Artista"
-                
-                st.markdown(f'''
-                <div class="grid-card">
-                    <img src="{thumb}" class="img-square">
-                    <div class="card-title">{title}</div>
-                    <div class="card-artist">{artist}</div>
-                </div>
-                ''', unsafe_allow_html=True)
-                
-                st.markdown('<div class="btn-pill">', unsafe_allow_html=True)
-                if st.button("▶", key=f"h_p_{i}_{item.get('videoId','id')}"):
+    if items:
+        # GRIGLIA POTENZIATA
+        for start in range(0, len(items), 5):
+            cols = st.columns(5)
+            for i, item in enumerate(items[start:start+5]):
+                with cols[i]:
+                    thumb = item['thumbnails'][-1]['url']
+                    title = item['title']
+                    artist = item['artists'][0]['name'] if item.get('artists') else "Artista"
                     v_id = item.get('videoId') if item.get('videoId') else item.get('id')
-                    st.session_state.current_url = f"https://www.youtube.com/watch?v={v_id}"
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    st.markdown(f'''
+                    <div class="grid-card">
+                        <img src="{thumb}" class="img-square">
+                        <div class="card-title">{title}</div>
+                        <div class="card-artist">{artist}</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                    
+                    if st.button("▶", key=f"home_{v_id}"):
+                        st.session_state.current_url = f"https://www.youtube.com/watch?v={v_id}"
+                        st.rerun()
     else:
-        st.error("ERRORE: IL MURO DI YOUTUBE È TROPPO ALTO. RIPROVA TRA 2 MINUTI [cite: 2026-02-20].")
+        st.error("L'ABISSO È MOMENTANEAMENTE CHIUSO. RIPROVA TRA POCO.")
 
 # === VISTA: CERCA ===
 elif st.session_state.current_view == "🔍 CERCA":
-    st.markdown('<div class="section-title">Cerca</div>', unsafe_allow_html=True)
-    query = st.text_input("", placeholder="Cosa vuoi ascoltare?")
+    st.markdown('<div class="section-title">Cerca nell\'Abisso</div>', unsafe_allow_html=True)
+    query = st.text_input("", placeholder="Artisti, Canzoni, Playlist...")
     if query:
-        results = ytmusic.search(query, limit=12)
-        for res in results:
-            if res.get('resultType') in ['song', 'video']:
-                title = f"{res.get('artists', [{'name': ''}])[0]['name']} - {res['title']}".upper()
-                url = f"https://www.youtube.com/watch?v={res['videoId']}"
-                thumb = res.get('thumbnails', [{'url': ''}])[-1]['url']
+        res = ytmusic.search(query, limit=12)
+        for r in res:
+            if r.get('resultType') in ['song', 'video']:
+                title = f"{r.get('artists', [{'name': ''}])[0]['name']} - {r['title']}".upper()
+                url = f"https://www.youtube.com/watch?v={r['videoId']}"
+                thumb = r.get('thumbnails', [{'url': ''}])[-1]['url']
                 
                 st.markdown('<div class="track-row">', unsafe_allow_html=True)
-                c1, c2, c3, c4 = st.columns([1, 6, 1, 1])
-                with c1: st.image(thumb, width=50)
+                c1, c2, c3 = st.columns([1, 7, 1])
+                with c1: st.image(thumb, width=60)
                 with c2: st.markdown(f"**{title}**")
                 with c3:
-                    st.markdown('<div class="btn-pill">', unsafe_allow_html=True)
-                    if st.button("▶", key=f"s_p_{res['videoId']}"):
-                        st.session_state.current_url = url; st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                with c4:
-                    if url not in df['URL'].values:
-                        if st.button("💾", key=f"s_s_{res['videoId']}"):
-                            df_new = pd.concat([get_db(), pd.DataFrame([{"TITOLO": title, "URL": url, "COPERTINA": thumb}])], ignore_index=True)
-                            conn.update(data=df_new.drop_duplicates())
-                            st.rerun()
-                    else: st.write("✅")
+                    if st.button("💾", key=f"save_{r['videoId']}"):
+                        df_new = pd.concat([get_db(), pd.DataFrame([{"TITOLO": title, "URL": url, "COPERTINA": thumb}])], ignore_index=True)
+                        conn.update(data=df_new.drop_duplicates())
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
 # === VISTA: LIBRERIA ===
 elif st.session_state.current_view == "🎧 LIBRERIA":
-    st.markdown('<div class="section-title">La tua libreria</div>', unsafe_allow_html=True)
-    if df.empty: st.info("Cantiere vuoto.")
+    st.markdown('<div class="section-title">La tua Libreria Blindata</div>', unsafe_allow_html=True)
+    if df.empty: st.info("Cantiere vuoto. Aggiungi brani per iniziare.")
     else:
         for idx, row in df.iterrows():
             st.markdown('<div class="track-row">', unsafe_allow_html=True)
             cl1, cl2, cl3, cl4 = st.columns([1, 6, 1, 1])
-            with cl1: st.image(row['COPERTINA'], width=45)
+            with cl1: st.image(row['COPERTINA'], width=50)
             with cl2: st.markdown(f"**{row['TITOLO']}**")
             with cl3:
-                st.markdown('<div class="btn-pill">', unsafe_allow_html=True)
-                if st.button("▶", key=f"l_p_{idx}"):
+                if st.button("▶", key=f"play_lib_{idx}"):
                     st.session_state.current_url = row['URL']; st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
             with cl4:
-                if st.button("❌", key=f"l_d_{idx}"):
+                if st.button("❌", key=f"del_lib_{idx}"):
                     conn.update(data=df.drop(index=idx)); st.rerun()
