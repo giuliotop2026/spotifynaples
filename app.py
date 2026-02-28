@@ -5,10 +5,10 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 import urllib.parse
 
-# PROTOCOLLO GRANITO 3.1: CONFIGURAZIONE CANTIERE [cite: 2026-02-25]
+# PROTOCOLLO GRANITO 3.0: CANTIERE BLINDATO E DOWNLOAD DIRETTO
 st.set_page_config(page_title="MUSIC LOCK PRO - SISTEMA GRANITO", layout="wide")
 
-# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD [cite: 2026-01-20]
+# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD
 st.markdown("""
 <style>
     .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
@@ -33,17 +33,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE GOOGLE SHEETS - ZERO ERRORI [cite: 2026-01-19, 2026-02-25]
+# CONNESSIONE DATABASE GOOGLE SHEETS - ZERO ERRORI
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_db():
     try:
-        # LETTURA DIRETTA DAL CANTIERE [cite: 2026-02-20]
-        return conn.read(worksheet="Sheet1", ttl=0)
+        # AGGANCIO DIRETTO ALLA PARTICELLA "musica db"
+        return conn.read(worksheet="musica db", ttl=0)
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# MOTORE DI RICERCA CON POLMONI D'ACCIAIO [cite: 2026-02-18]
+# MOTORE CON POLMONI D'ACCIAIO
 def search_yt(query):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -62,19 +62,19 @@ def search_yt(query):
         except:
             return []
 
-# INTERFACCIA PRINCIPALE - PROGETTO BLUE LOCK [cite: 2026-01-19]
-st.title("🎵 MUSIC LOCK - SISTEMA GRANITO 3.1")
+# INTERFACCIA PRINCIPALE
+st.title("🎵 MUSIC LOCK - PIAZZATO BLINDATO")
 st.write("---")
 
-menu = st.sidebar.radio("NAVIGAZIONE CANTIERE", ["🔍 RICERCA BRANI", "📂 LIBRERIA PREFERITI"])
+menu = st.sidebar.radio("NAVIGAZIONE CANTIERE", ["🔍 RICERCA PARTICELLE", "📂 LIBRERIA PREFERITI"])
 
-if menu == "🔍 RICERCA BRANI":
-    query = st.text_input("INSERISCI IL MOTORE DA SCANSIONARE (ES: NOME CANZONE)")
+if menu == "🔍 RICERCA PARTICELLE":
+    query = st.text_input("INSERISCI LA PARTICELLA DA SCANSIONARE (MAIUSCOLO)")
     if query:
         with st.spinner("SCANSIONE DELL'ABISSO IN CORSO..."):
             results = search_yt(query)
             if not results:
-                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. IL MOTORE DI RICERCA È BLOCCATO [cite: 2026-01-25].")
+                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE.")
             else:
                 for vid in results:
                     with st.container():
@@ -87,27 +87,25 @@ if menu == "🔍 RICERCA BRANI":
                                 df = get_db()
                                 new_row = pd.DataFrame([{"TITOLO": vid['title'].upper(), "URL": vid['webpage_url'], "CATEGORIA": "PREFERITI"}])
                                 updated_df = pd.concat([df, new_row], ignore_index=True).drop_duplicates()
-                                # BLINDA IL SALVATAGGIO NEL DATABASE [cite: 2026-02-25]
-                                conn.update(worksheet="Sheet1", data=updated_df)
-                                st.success("VINCITORE NASCOSTO SALVATO! [cite: 2026-02-20]")
+                                # SCRITTURA NELLA PARTICELLA "musica db" ESATTA
+                                conn.update(worksheet="musica db", data=updated_df)
+                                st.success("VINCITORE NASCOSTO SALVATO CON DENSITÀ MASSIMA!")
                         with c3:
-                            # DOWNLOAD ESTERNO SICURO 10000% [cite: 2026-02-07, 2026-02-25]
-                            notube = f"https://notube.link/it/youtube-app-317?url={urllib.parse.quote(vid['webpage_url'])}"
-                            st.markdown(f'<a href="{notube}" target="_blank"><button style="width:100%; height:55px; background-color:#007FFF; color:white; border-radius:30px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ DOWNLOAD</button></a>', unsafe_allow_html=True)
+                            # DOWNLOAD DIRETTO NOTUBE
+                            notube_direct = f"https://notube.net/it/convert-it?url={urllib.parse.quote(vid['webpage_url'])}"
+                            st.markdown(f'<a href="{notube_direct}" target="_blank"><button style="width:100%; height:55px; background-color:#007FFF; color:white; border-radius:30px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ DOWNLOAD</button></a>', unsafe_allow_html=True)
 
 else:
-    st.title("📂 LIBRERIA PREFERITI - GLORIA ETERNA [cite: 2026-02-21]")
+    st.title("📂 LIBRERIA PREFERITI - GLORIA ETERNA")
     df = get_db()
     if df.empty:
-        st.warning("IL CANTIERE È VUOTO. NESSUN BRANO BLINDATO [cite: 2026-02-20].")
+        st.warning("IL CANTIERE È VUOTO. PROCEDI ALLA RICERCA.")
     else:
         for i, row in df.iterrows():
             with st.expander(f"🎵 {row['TITOLO']}"):
-                st.write(f"DENSITÀ TECNICA: {row['URL']}")
-                if st.button("RIPRODUCI ORA", key=f"p_{i}"):
-                    # FIX INDEXERROR: VERIFICA PRESENZA PARTICELLE [cite: 2026-01-25, 2026-02-25]
+                if st.button("ASCOLTA ORA", key=f"p_{i}"):
                     fresh_results = search_yt(row['URL'])
                     if fresh_results and len(fresh_results) > 0:
                         st.audio(fresh_results[0]['url'])
                     else:
-                        st.error("ERRORE: IMPOSSIBILE AGGANCIARE LA PARTICELLA [cite: 2026-01-25].")
+                        st.error("ERRORE: IMPOSSIBILE AGGANCIARE LA PARTICELLA.")
