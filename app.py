@@ -3,9 +3,8 @@ import yt_dlp
 import os
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
-import urllib.parse
 
-# PROTOCOLLO GRANITO 3.0: CANTIERE BLINDATO E DOWNLOAD DIRETTO
+# PROTOCOLLO GRANITO 3.3: CANTIERE BLINDATO E COPIA-INCOLLA TATTICO [cite: 2026-02-25]
 st.set_page_config(page_title="MUSIC LOCK PRO - SISTEMA GRANITO", layout="wide")
 
 # CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD
@@ -30,16 +29,17 @@ st.markdown("""
     }
     p, span, label, .stMarkdown { color: #000000 !important; font-weight: 900 !important; text-transform: uppercase !important; }
     input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; }
+    code { color: #007FFF !important; font-weight: bold !important; font-size: 14px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE GOOGLE SHEETS - ZERO ERRORI
+# CONNESSIONE DATABASE GOOGLE SHEETS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_db():
     try:
-        # AGGANCIO DIRETTO ALLA PARTICELLA "musica db"
-        return conn.read(worksheet="musica db", ttl=0)
+        # IL MOTORE AGGANCIA LA PRIMA SCHEDA DISPONIBILE IN AUTOMATICO
+        return conn.read(ttl=0)
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
@@ -87,13 +87,16 @@ if menu == "🔍 RICERCA PARTICELLE":
                                 df = get_db()
                                 new_row = pd.DataFrame([{"TITOLO": vid['title'].upper(), "URL": vid['webpage_url'], "CATEGORIA": "PREFERITI"}])
                                 updated_df = pd.concat([df, new_row], ignore_index=True).drop_duplicates()
-                                # SCRITTURA NELLA PARTICELLA "musica db" ESATTA
-                                conn.update(worksheet="musica db", data=updated_df)
+                                # SALVATAGGIO DINAMICO SENZA NOME DELLA SCHEDA
+                                conn.update(data=updated_df)
                                 st.success("VINCITORE NASCOSTO SALVATO CON DENSITÀ MASSIMA!")
                         with c3:
-                            # DOWNLOAD DIRETTO NOTUBE
-                            notube_direct = f"https://notube.net/it/convert-it?url={urllib.parse.quote(vid['webpage_url'])}"
-                            st.markdown(f'<a href="{notube_direct}" target="_blank"><button style="width:100%; height:55px; background-color:#007FFF; color:white; border-radius:30px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ DOWNLOAD</button></a>', unsafe_allow_html=True)
+                            st.write("1️⃣ CLICCA A DESTRA PER COPIARE IL LINK:")
+                            st.code(vid['webpage_url'], language="text")
+                            
+                            st.write("2️⃣ APRI IL CONVERTITORE E INCOLLA:")
+                            notube_correct = "https://notube.link/it/youtube-app-317"
+                            st.markdown(f'<a href="{notube_correct}" target="_blank"><button style="width:100%; height:45px; background-color:#007FFF; color:white; border-radius:20px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ APRI SITO DOWNLOAD</button></a>', unsafe_allow_html=True)
 
 else:
     st.title("📂 LIBRERIA PREFERITI - GLORIA ETERNA")
@@ -103,6 +106,9 @@ else:
     else:
         for i, row in df.iterrows():
             with st.expander(f"🎵 {row['TITOLO']}"):
+                st.write("COPIA LINK PER DOWNLOAD:")
+                st.code(row['URL'], language="text")
+                
                 if st.button("ASCOLTA ORA", key=f"p_{i}"):
                     fresh_results = search_yt(row['URL'])
                     if fresh_results and len(fresh_results) > 0:
