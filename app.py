@@ -4,7 +4,7 @@ from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 import urllib.parse
 
-# PROTOCOLLO GRANITO 10.0: MOTORE IBRIDO DEFINITIVO E BYPASS LINK DIRETTI
+# PROTOCOLLO GRANITO 11.0: MOTORE ASSOCIATIVO SPOTIFY-LIKE E ZERO CRASH
 st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
 st.markdown("""
@@ -28,9 +28,8 @@ def get_db():
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# MOTORE 1: BRANI SINGOLI (CON BYPASS LINK DIRETTO)
+# MOTORE 1: BRANI SINGOLI
 def search_songs(query):
-    # BYPASS: Cattura immediata se inserisci un link diretto
     if "youtube.com" in query or "youtu.be" in query:
         parsed = urllib.parse.urlparse(query)
         qs = urllib.parse.parse_qs(parsed.query)
@@ -57,9 +56,9 @@ def search_songs(query):
     except:
         return []
 
-# MOTORE 2: PLAYLIST UFFICIALI (CON BYPASS LINK E COMMUNITY FALLBACK)
+# MOTORE 2: PLAYLIST ASSOCIATIVE (IL VERO SEGRETO DI SPOTIFY)
 def search_playlists(query):
-    # BYPASS: Cattura immediata del link Playlist (es: quello della tua foto)
+    # BYPASS LINK DIRETTO
     if "list=" in query:
         parsed = urllib.parse.urlparse(query)
         qs = urllib.parse.parse_qs(parsed.query)
@@ -69,32 +68,41 @@ def search_playlists(query):
             return [{'id': play_id, 'title': f"PLAYLIST: INSERITA MANUALMENTE", 'url': f"https://www.youtube.com/playlist?list={play_id}"}]
             
     try:
-        # Cerca playlist ufficiali, se vuoto cerca nella community
-        search_results = ytmusic.search(query, filter="playlists", limit=5)
+        # INIEZIONE ASSOCIATIVA: AGGIUNGIAMO "PLAYLIST" SE NON C'È GIÀ PER FORZARE I RISULTATI TEMATICI
+        search_query = query if "playlist" in query.lower() else f"{query} playlist"
+        
+        # SCANSIONIAMO PRIMA LA COMMUNITY PER TROVARE ASSOCIAZIONI (ES. "ROCKY WORKOUT")
+        search_results = ytmusic.search(search_query, filter="community_playlists", limit=8)
+        
+        # SE LA COMMUNITY NON HA NULLA, SCANSIONIAMO QUELLE UFFICIALI
         if not search_results:
-            search_results = ytmusic.search(query, filter="community_playlists", limit=5)
+            search_results = ytmusic.search(search_query, filter="playlists", limit=8)
             
         formatted = []
         for res in search_results:
-            play_id = res.get('browseId', '')
-            if not play_id: continue
-            if play_id.startswith("VL"): play_id = play_id[2:]
-            
-            # Lettura blindata dell'autore
-            author_data = res.get('author', 'Community')
-            if isinstance(author_data, list):
-                author = ", ".join([a.get('name', '') for a in author_data if isinstance(a, dict)])
-            else:
-                author = str(author_data)
+            try:
+                play_id = res.get('browseId', '')
+                if not play_id: continue
+                if play_id.startswith("VL"): play_id = play_id[2:]
                 
-            title = res.get('title', 'Playlist Sconosciuta')
-            formatted.append({
-                'id': play_id,
-                'title': f"PLAYLIST: {author} - {title}".upper(),
-                'url': f"https://www.youtube.com/playlist?list={play_id}"
-            })
+                author_data = res.get('author', 'Community')
+                if isinstance(author_data, list):
+                    author = ", ".join([a.get('name', '') for a in author_data if isinstance(a, dict)])
+                else:
+                    author = str(author_data)
+                    
+                title = res.get('title', 'Playlist Sconosciuta')
+                formatted.append({
+                    'id': play_id,
+                    'title': f"PLAYLIST: {author} - {title}".upper(),
+                    'url': f"https://www.youtube.com/playlist?list={play_id}"
+                })
+            except Exception:
+                # CEMENTO ANTI-CRASH: SE UNA PLAYLIST HA DATI CORROTTI, LA IGNORA E PASSA OLTRE
+                continue
+                
         return formatted
-    except Exception as e:
+    except Exception:
         return []
 
 st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
@@ -108,14 +116,13 @@ menu = st.sidebar.radio("SALA REGIA", ["🔍 RICERCA BRANI E PLAYLIST", "🎧 LA
 if menu == "🔍 RICERCA BRANI E PLAYLIST":
     st.markdown("### SCANSIONA L'ABISSO DEL DATABASE MUSICALE")
     
-    tipo_ricerca = st.radio("SELEZIONA IL FLUSSO CHE DESIDERI:", ["🎵 BRANO SINGOLO (Stile Spotify)", "📁 PLAYLIST INTERA (Flusso Continuo)"], horizontal=True)
+    tipo_ricerca = st.radio("SELEZIONA IL FLUSSO CHE DESIDERI:", ["🎵 BRANO SINGOLO (Stile Spotify)", "📁 PLAYLIST INTERA E ASSOCIATIVA"], horizontal=True)
     
-    # ISTRUZIONI AGGIORNATE
-    st.write("Puoi scrivere il nome (es: ROCKY) oppure **incollare direttamente il link di YouTube!**")
+    st.write("PUOI SCRIVERE IL NOME (ES: ROCKY) OPPURE INCOLLARE DIRETTAMENTE IL LINK DI YOUTUBE!")
     query = st.text_input("INSERISCI TESTO O LINK YOUTUBE:")
     
     if query:
-        with st.spinner("SCANSIONE IN CORSO CON POLMONI D'ACCIAIO..."):
+        with st.spinner("SCANSIONE IN CORSO CON ACAZZIAM POLMONEI DACCIAAIO E VOGLIA DI VINCERE..."):
             if "SINGOLO" in tipo_ricerca:
                 results = search_songs(query)
                 is_playlist = False
@@ -124,7 +131,7 @@ if menu == "🔍 RICERCA BRANI E PLAYLIST":
                 is_playlist = True
                 
             if not results:
-                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE.")
+                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE O NOME TROPPO GENERICO.")
             else:
                 for item in results:
                     with st.container():
@@ -154,7 +161,7 @@ else:
         df_singoli = df[~df['URL'].str.contains('list=')]
         df_playlist = df[df['URL'].str.contains('list=')]
         
-        # === SEZIONE 1: LETTORE SINGOLI BRANI (SPOTIFY CLONE) ===
+        # LETTORE SINGOLI BRANI
         if not df_singoli.empty:
             st.markdown("### 🎵 CODA DI RIPRODUZIONE BRANI SINGOLI")
             
@@ -199,7 +206,7 @@ else:
 
         st.write("---")
         
-        # === SEZIONE 2: LETTORE PLAYLIST (BACKGROUND CONTINUO) ===
+        # LETTORE PLAYLIST
         if not df_playlist.empty:
             st.markdown("### 📁 LE TUE PLAYLIST SALVATE")
             for idx, row in df_playlist.iterrows():
