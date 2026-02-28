@@ -2,147 +2,165 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
-import streamlit.components.v1 as components
 
-# PROTOCOLLO GRANITO 20.0: GESTURE CONTROL & MOBILE HORIZONTAL FLOW [cite: 2026-02-25]
+# PROTOCOLLO GRANITO 21.0: VISUAL ENGINE & MOBILE HYBRID LAYOUT [cite: 2026-02-25]
 st.set_page_config(page_title="SIMPATIC-MUSIC", layout="wide", initial_sidebar_state="collapsed")
 
-# CSS: SPOTIFY NATIVE APP CLONE - FULL DARK & GESTURE READY [cite: 2026-01-20]
+# CSS: SPOTIFY DARK DESIGN CON COPERTINE ARROTONDATE E LISTA MOBILE [cite: 2026-01-20]
 st.markdown("""
 <style>
     .stApp { background-color: #000000 !important; color: #FFFFFF !important; }
+    h1, h2, h3 { color: #1DB954 !important; font-weight: 900; }
     
-    /* NASCONDI ELEMENTI DISTURBO */
-    #MainMenu, footer, header {visibility: hidden;}
-    
-    /* CONTENITORE PLAYER ORIZZONTALE */
-    .player-container {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        height: 80vh; text-align: center; padding: 20px;
+    /* PLAYER PRINCIPALE */
+    .main-player {
+        background-color: #121212; padding: 20px; border-radius: 20px;
+        border: 1px solid #282828; text-align: center; margin-bottom: 25px;
     }
     
-    .album-art {
-        width: 300px; height: 300px; background: linear-gradient(135deg, #1DB954, #121212);
-        border-radius: 20px; box-shadow: 0px 20px 40px rgba(0,0,0,0.8);
-        margin-bottom: 30px; display: flex; align-items: center; justify-content: center;
-        border: 2px solid #1DB954;
+    /* COPERTINA BRANO */
+    .album-cover {
+        width: 250px; height: 250px; border-radius: 15px;
+        object-fit: cover; box-shadow: 0px 10px 30px rgba(0,0,0,0.8);
+        margin: 0 auto 20px auto; border: 2px solid #1DB954;
     }
     
-    .track-info h2 { color: #FFFFFF !important; font-weight: 900; font-size: 24px; margin-bottom: 5px; }
-    .track-info p { color: #1DB954 !important; font-size: 18px; font-weight: 700; text-transform: uppercase; }
-    
-    /* GESTURE FEEDBACK */
-    .swipe-area {
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        z-index: 5; background: transparent;
+    /* LISTA BRANI SOTTO IL PLAYER */
+    .track-row {
+        background-color: #181818; padding: 12px; border-radius: 10px;
+        margin-bottom: 10px; display: flex; align-items: center;
+        border: 1px solid #282828; transition: 0.3s;
     }
+    .active-row { border-color: #1DB954 !important; background-color: #282828 !important; }
     
-    .stVideo { border-radius: 15px; overflow: hidden; border: 1px solid #282828; }
+    .stButton>button { 
+        background-color: #1DB954 !important; color: white !important; 
+        border-radius: 50px !important; font-weight: 700 !important; border: none !important;
+    }
+    .btn-delete>button { background-color: #E91E63 !important; }
+    input { background-color: #181818 !important; color: white !important; border: 1px solid #1DB954 !important; }
 </style>
 """, unsafe_allow_html=True)
-
-# JAVASCRIPT PER RILEVAMENTO SWIPE (SINISTRA/DESTRA) [cite: 2026-02-25]
-components.html("""
-<script>
-    let touchstartX = 0;
-    let touchendX = 0;
-    
-    const handleGesture = () => {
-        if (touchendX < touchstartX - 100) {
-            // SWIPE SINISTRA -> SUCCESSIVO
-            window.parent.postMessage({type: 'swipe', direction: 'next'}, '*');
-        }
-        if (touchendX > touchstartX + 100) {
-            // SWIPE DESTRA -> PRECEDENTE
-            window.parent.postMessage({type: 'swipe', direction: 'prev'}, '*');
-        }
-    }
-
-    document.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; });
-    document.addEventListener('touchend', e => { touchendX = e.changedTouches[0].screenX; handleGesture(); });
-</script>
-""", height=0)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 ytmusic = YTMusic()
 
-# GESTIONE SESSIONE PER SWIPE [cite: 2026-02-25]
+# SESSIONE PER IL CONTROLLO [cite: 2026-02-25]
 if 'track_idx' not in st.session_state: st.session_state.track_idx = 0
-if 'lib_playing' not in st.session_state: st.session_state.lib_playing = False
-
-# ASCOLTO MESSAGGI DAL JAVASCRIPT (SWIPE)
-# Nota: Streamlit non legge direttamente i messaggi JS senza componenti complessi, 
-# simuliamo il controllo con i tasti invisibili o lo slider nativo per questa versione.
+if 'is_playing' not in st.session_state: st.session_state.is_playing = False
 
 def get_db():
     try: return conn.read(ttl=0)
-    except: return pd.DataFrame(columns=["TITOLO", "URL"])
+    except: return pd.DataFrame(columns=["TITOLO", "URL", "COPERTINA"])
+
+def search_music(query):
+    try:
+        results = ytmusic.search(query, limit=15)
+        formatted = []
+        for res in results:
+            if res.get('resultType') in ['song', 'video']:
+                artists = res.get('artists', [{'name': 'Artista'}])
+                # CATTURA LA COPERTINA (THUMBNAIL) [cite: 2026-02-25]
+                thumb = res.get('thumbnails', [{'url': ''}])[-1]['url']
+                formatted.append({
+                    'id': res.get('videoId'),
+                    'title': f"{artists[0]['name']} - {res['title']}".upper(),
+                    'url': f"https://www.youtube.com/watch?v={res['videoId']}",
+                    'thumb': thumb
+                })
+        return formatted
+    except: return []
 
 st.title("🎵 SIMPATIC-MUSIC")
-tabs = st.tabs(["🎧 ORA IN ONDA", "🔍 AGGIUNGI", "⚙️ GESTISCI"])
+tabs = st.tabs(["🎧 LIBRERIA", "🔍 SCOPRI", "📥 SCARICA"])
 
-df = get_db()
-
-# --- TAB 1: PLAYER ORIZZONTALE (SPOTIFY NOW PLAYING) ---
+# --- TAB 1: LIBRERIA (PLAYER + LISTA SOTTO) ---
 with tabs[0]:
+    df = get_db()
     if df.empty:
-        st.info("LIBRERIA VUOTA. AGGIUNGI UN BRANO [cite: 2026-02-20].")
+        st.info("IL CANTIERE È VUOTO. AGGIUNGI MUSICA [cite: 2026-02-20].")
     else:
+        # PLAYER SUPREMO IN ALTO [cite: 2026-02-25]
         if st.session_state.track_idx >= len(df): st.session_state.track_idx = 0
         curr = df.iloc[st.session_state.track_idx]
         
-        st.markdown(f"""
-        <div class="player-container">
-            <div class="album-art">
-                <h1 style="font-size: 80px;">🎵</h1>
-            </div>
-            <div class="track-info">
-                <h2>{curr['TITOLO']}</h2>
-                <p>BRANO {st.session_state.track_idx + 1} DI {len(df)}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # PLAYER VIDEO NASCOSTO O MINIMALE [cite: 2026-02-25]
-        st.video(curr['URL'])
-        
-        # CONTROLLI DI NAVIGAZIONE (SIMULAZIONE GESTURE) [cite: 2026-02-25]
-        c1, c2, c3 = st.columns([1,2,1])
-        if c1.button("⏮", key="prev"):
-            st.session_state.track_idx = (st.session_state.track_idx - 1) % len(df)
-            st.rerun()
-        with c2:
-            # Slider per scorrimento rapido orizzontale
-            val = st.slider("SCORRI BRANI", 0, len(df)-1, st.session_state.track_idx)
-            if val != st.session_state.track_idx:
-                st.session_state.track_idx = val
+        with st.container():
+            st.markdown(f'<div class="main-player">', unsafe_allow_html=True)
+            # MOSTRA LA COPERTINA ORIGINALE [cite: 2026-02-25]
+            if 'COPERTINA' in curr and pd.notnull(curr['COPERTINA']):
+                st.image(curr['COPERTINA'], width=250)
+            else:
+                st.markdown('<div class="album-cover"><h1>🎵</h1></div>', unsafe_allow_html=True)
+            
+            st.markdown(f"### {curr['TITOLO']}")
+            
+            c1, c2, c3 = st.columns([1,1,1])
+            if c1.button("⏮", key="l_prev"):
+                st.session_state.track_idx = (st.session_state.track_idx - 1) % len(df)
+                st.session_state.is_playing = True
                 st.rerun()
-        if c3.button("⏭", key="next"):
-            st.session_state.track_idx = (st.session_state.track_idx + 1) % len(df)
-            st.rerun()
+            with c2:
+                if st.button("▶️/⏸", key="l_play"):
+                    st.session_state.is_playing = not st.session_state.is_playing
+                    st.rerun()
+            if c3.button("⏭", key="l_next"):
+                st.session_state.track_idx = (st.session_state.track_idx + 1) % len(df)
+                st.session_state.is_playing = True
+                st.rerun()
+            
+            if st.session_state.is_playing:
+                st.video(curr['URL'])
+            st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 2: RICERCA ---
-with tabs[1]:
-    query = st.text_input("CERCA E AGGIUNGI AL FLUSSO")
-    if query:
-        with st.spinner("SCANSIONE..."):
-            res = ytmusic.search(query, limit=10)
-            for r in res:
-                if r.get('resultType') in ['song', 'video']:
-                    title = f"{r.get('artists', [{'name':''}] )[0]['name']} - {r['title']}".upper()
-                    url = f"https://www.youtube.com/watch?v={r['videoId']}"
-                    if st.button(f"➕ {title}", key=r['videoId']):
-                        df_new = pd.concat([df, pd.DataFrame([{"TITOLO": title, "URL": url}])], ignore_index=True).drop_duplicates()
-                        conn.update(data=df_new)
-                        st.success("AGGIUNTO!")
+        st.write("---")
+        st.markdown("### 📋 LA TUA DISCOTECA")
+        
+        # LISTA SCORREVILE SOTTO IL PLAYER [cite: 2026-02-25]
+        for idx, row in df.iterrows():
+            is_active = "active-row" if idx == st.session_state.track_idx else ""
+            with st.container():
+                col_img, col_txt, col_btn = st.columns([1, 4, 1])
+                with col_img:
+                    if 'COPERTINA' in row and pd.notnull(row['COPERTINA']):
+                        st.image(row['COPERTINA'], width=50)
+                with col_txt:
+                    st.markdown(f"**{row['TITOLO']}**")
+                with col_btn:
+                    if st.button("▶️", key=f"list_p_{idx}"):
+                        st.session_state.track_idx = idx
+                        st.session_state.is_playing = True
                         st.rerun()
 
-# --- TAB 3: DOWNLOAD & CANCELLAZIONE ---
+# --- TAB 2: SCOPRI (CON ANTEPRIMA COPERTINE) ---
+with tabs[1]:
+    query = st.text_input("CERCA BRANO O ARTISTA")
+    if query:
+        results = search_music(query)
+        df_current = get_db()
+        for item in results:
+            is_saved = item['url'] in df_current['URL'].values
+            with st.container():
+                c_img, c_info = st.columns([1, 3])
+                with c_img: st.image(item['thumb'], width=80)
+                with c_info:
+                    st.markdown(f"**{item['title']}**")
+                    if is_saved:
+                        st.write("✅ GIÀ IN LIBRERIA")
+                    else:
+                        if st.button("💾 AGGIUNGI", key=f"add_{item['id']}"):
+                            new_row = pd.DataFrame([{"TITOLO": item['title'], "URL": item['url'], "COPERTINA": item['thumb']}])
+                            conn.update(data=pd.concat([df_current, new_row], ignore_index=True).drop_duplicates())
+                            st.success("SALVATO!")
+                            st.rerun()
+
+# --- TAB 3: GESTISCI & DOWNLOAD ---
 with tabs[2]:
     for idx, row in df.iterrows():
         with st.expander(f"⚙️ {row['TITOLO']}"):
             st.code(row['URL'])
             st.markdown(f'<a href="https://notube.link/it/youtube-app-317?url={row["URL"]}" target="_blank"><button style="width:100%; height:40px; background-color:#007FFF; color:white; border:none; border-radius:10px; font-weight:bold;">SCARICA MP3</button></a>', unsafe_allow_html=True)
+            st.markdown('<div class="btn-delete">', unsafe_allow_html=True)
             if st.button("❌ ELIMINA", key=f"del_{idx}"):
                 conn.update(data=df.drop(index=idx))
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
