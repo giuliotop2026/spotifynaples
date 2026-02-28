@@ -4,10 +4,10 @@ import os
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
-# PROTOCOLLO GRANITO 3.4: CANTIERE BLINDATO, FIX LINK DIRETTI E MAIUSCOLE [cite: 2026-02-25]
-st.set_page_config(page_title="MUSIC LOCK PRO - SISTEMA GRANITO", layout="wide")
+# CONFIGURAZIONE APP: SIMPATIC-MUSIC LA MUSICA E LIBERTA
+st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
-# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD
+# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD, COLORI VIVACI
 st.markdown("""
 <style>
     .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
@@ -30,12 +30,12 @@ st.markdown("""
     p, span, label, .stMarkdown { color: #000000 !important; font-weight: 900 !important; text-transform: uppercase !important; }
     input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; }
     
-    /* FIX LETALE: IL LINK DEVE ESSERE ESATTO, MAI MAIUSCOLO FORZATO */
+    /* IL LINK DEVE ESSERE ESATTO, MAI MAIUSCOLO FORZATO PER NON ROVINARE IL DISCO */
     code { color: #007FFF !important; font-weight: bold !important; font-size: 14px !important; text-transform: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE GOOGLE SHEETS - ZERO ERRORI [cite: 2026-01-19, 2026-02-20]
+# CONNESSIONE DATABASE GOOGLE SHEETS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_db():
@@ -44,7 +44,7 @@ def get_db():
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# MOTORE CON POLMONI D'ACCIAIO: GESTISCE SIA RICERCHE CHE LINK DIRETTI [cite: 2026-02-18]
+# MOTORE AUDIO - POLMONI D'ACCIAIO
 def search_yt(query):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -58,11 +58,9 @@ def search_yt(query):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(query, download=False)
-            # FIX: Se il risultato è una lista di ricerca (entries), prendi la lista.
             if 'entries' in info:
                 results = info.get('entries', [])
                 return [r for r in results if r is not None]
-            # FIX: Se il risultato è un link diretto (singolo video), incapsulalo in una lista.
             elif info is not None:
                 return [info]
             else:
@@ -71,18 +69,18 @@ def search_yt(query):
             return []
 
 # INTERFACCIA PRINCIPALE
-st.title("🎵 MUSIC LOCK - PIAZZATO BLINDATO")
+st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
 st.write("---")
 
-menu = st.sidebar.radio("NAVIGAZIONE CANTIERE", ["🔍 RICERCA PARTICELLE", "📂 LIBRERIA PREFERITI"])
+menu = st.sidebar.radio("SALA REGIA", ["🔍 CERCA SINFONIA", "📂 LA TUA DISCOTECA"])
 
-if menu == "🔍 RICERCA PARTICELLE":
-    query = st.text_input("INSERISCI LA PARTICELLA DA SCANSIONARE (MAIUSCOLO)")
+if menu == "🔍 CERCA SINFONIA":
+    query = st.text_input("INSERISCI L'ARTISTA O LA TRACCIA (MAIUSCOLO)")
     if query:
-        with st.spinner("SCANSIONE DELL'ABISSO IN CORSO... [cite: 2026-02-20]"):
+        with st.spinner("ACCORDANDO GLI STRUMENTI IN CORSO..."):
             results = search_yt(query)
             if not results:
-                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE.")
+                st.error("ERRORE: NESSUN ACCORDO TROVATO. CAMBIA SPARTITO E RIPROVA.")
             else:
                 for vid in results:
                     with st.container():
@@ -91,35 +89,34 @@ if menu == "🔍 RICERCA PARTICELLE":
                         with c1:
                             st.audio(vid['url'])
                         with c2:
-                            if st.button("💾 SALVA NEL CANTIERE", key=f"s_{vid['id']}"):
+                            if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"s_{vid['id']}"):
                                 df = get_db()
-                                new_row = pd.DataFrame([{"TITOLO": vid['title'].upper(), "URL": vid['webpage_url'], "CATEGORIA": "PREFERITI"}])
+                                new_row = pd.DataFrame([{"TITOLO": vid['title'].upper(), "URL": vid['webpage_url'], "CATEGORIA": "DISCOTECA"}])
                                 updated_df = pd.concat([df, new_row], ignore_index=True).drop_duplicates()
                                 conn.update(data=updated_df)
-                                st.success("VINCITORE NASCOSTO SALVATO CON DENSITÀ MASSIMA! [cite: 2026-02-20]")
+                                st.success("TRACCIA REGISTRATA CON SUCCESSO NELLA TUA DISCOTECA!")
                         with c3:
-                            st.write("1️⃣ CLICCA A DESTRA PER COPIARE IL LINK:")
+                            st.write("1️⃣ COPIA IL LINK DEL DISCO:")
                             st.code(vid['webpage_url'], language="text")
                             
-                            st.write("2️⃣ APRI IL CONVERTITORE E INCOLLA:")
+                            st.write("2️⃣ VAI IN SALA INCISIONE (DOWNLOAD):")
                             notube_correct = "https://notube.link/it/youtube-app-317"
-                            st.markdown(f'<a href="{notube_correct}" target="_blank"><button style="width:100%; height:45px; background-color:#007FFF; color:white; border-radius:20px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ APRI SITO DOWNLOAD</button></a>', unsafe_allow_html=True)
+                            st.markdown(f'<a href="{notube_correct}" target="_blank"><button style="width:100%; height:45px; background-color:#007FFF; color:white; border-radius:20px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ SCARICA MP3</button></a>', unsafe_allow_html=True)
 
 else:
-    st.title("📂 LIBRERIA PREFERITI - GLORIA ETERNA [cite: 2026-02-21]")
+    st.title("📂 LA TUA DISCOTECA PERSONALE")
     df = get_db()
     if df.empty:
-        st.warning("IL CANTIERE È VUOTO. PROCEDI ALLA RICERCA.")
+        st.warning("LA DISCOTECA È VUOTA. INIZIA A COMPORRE LA TUA PLAYLIST.")
     else:
         for i, row in df.iterrows():
             with st.expander(f"🎵 {row['TITOLO']}"):
-                st.write("COPIA LINK PER DOWNLOAD:")
+                st.write("COPIA IL LINK DELLA TRACCIA:")
                 st.code(row['URL'], language="text")
                 
-                if st.button("ASCOLTA ORA", key=f"p_{i}"):
-                    # ORA IL MOTORE RICONOSCE PERFETTAMENTE IL LINK DIRETTO E NON VA IN CRASH
+                if st.button("▶️ SUONA LA TRACCIA", key=f"p_{i}"):
                     fresh_results = search_yt(row['URL'])
                     if fresh_results and len(fresh_results) > 0:
                         st.audio(fresh_results[0]['url'])
                     else:
-                        st.error("ERRORE: IMPOSSIBILE AGGANCIARE LA PARTICELLA. [cite: 2026-01-25]")
+                        st.error("ERRORE: IMPOSSIBILE LEGGERE LO SPARTITO. IL DISCO POTREBBE ESSERE GRAFFIATO.")
