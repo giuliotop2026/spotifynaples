@@ -3,51 +3,61 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 
-# PROTOCOLLO GRANITO 30.0: IL VERO CLONE DI SPOTIFY CON HIT MONDIALI [cite: 2026-02-25]
+# PROTOCOLLO GRANITO 31.1: ZERO BIANCO E CLASSIFICHE REALI [cite: 2026-02-25]
 st.set_page_config(page_title="SIMPATIC-MUSIC", layout="wide", initial_sidebar_state="expanded")
 
-# CSS SUPREMO: PULIZIA TOTALE DEI "COSI BIANCHI" E DESIGN NATIVO [cite: 2026-01-20, 2026-02-25]
+# CSS: DISINTEGRAZIONE DEL BIANCO E DESIGN SPOTIFY NATIVO [cite: 2026-01-20, 2026-02-25]
 st.markdown("""
 <style>
-    .stApp { background-color: #121212 !important; color: #FFFFFF !important; }
+    /* SFONDO NERO ASSOLUTO */
+    .stApp { background-color: #000000 !important; color: #FFFFFF !important; }
     [data-testid="stSidebar"] { background-color: #000000 !important; border-right: 1px solid #121212; }
     
     /* TITOLI SEZIONI */
-    .section-title { font-size: 26px; font-weight: 800; color: white; margin: 30px 0 20px 0; border-left: 6px solid #1DB954; padding-left: 15px; }
+    .section-title { font-size: 26px; font-weight: 800; color: white; margin: 30px 0 20px 0; border-left: 6px solid #1DB954; padding-left: 15px; text-transform: uppercase; }
     
-    /* MENU SIDEBAR - RIPRISTINATO E PULITO */
-    [data-testid="stSidebar"] .stButton button {
-        background-color: transparent !important; color: #b3b3b3 !important;
-        border: none !important; text-align: left !important; justify-content: flex-start !important;
-        font-size: 16px !important; font-weight: 700 !important; width: 100% !important;
-        padding: 12px !important; border-radius: 4px !important; transition: 0.2s;
+    /* ELIMINAZIONE TOTALE DEI "COSI BIANCHI" DAI PULSANTI [cite: 2026-02-25] */
+    .stButton>button { 
+        background-color: transparent !important; 
+        color: #b3b3b3 !important;
+        border: none !important; 
+        box-shadow: none !important;
+        transition: 0.2s !important;
+        text-transform: uppercase !important;
+        font-weight: 700 !important;
     }
-    [data-testid="stSidebar"] .stButton button:hover { color: #FFFFFF !important; background-color: #282828 !important; }
+    .stButton>button:hover { color: #FFFFFF !important; background-color: #282828 !important; }
 
-    /* CARD HOME PAGE - DESIGN PROFESSIONALE */
-    .grid-card { background-color: #181818; padding: 15px; border-radius: 10px; transition: 0.3s; height: 100%; border: 1px solid transparent; }
-    .grid-card:hover { background-color: #282828; }
-    .img-square { border-radius: 8px; width: 100%; aspect-ratio: 1; object-fit: cover; margin-bottom: 15px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
-    .card-title { color: white; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .card-artist { color: #b3b3b3; font-size: 12px; margin-top: 5px; }
-    
-    /* ELIMINAZIONE "COSI BIANCHI" - PULSANTE PLAY VERDE NATIVO [cite: 2026-02-25] */
-    .play-trigger .stButton button {
-        background-color: #1DB954 !important; color: black !important;
-        border-radius: 50% !important; width: 48px !important; height: 48px !important;
-        border: none !important; font-size: 22px !important; font-weight: 900 !important;
-        margin-top: -60px !important; margin-left: auto !important; display: flex !important;
-        align-items: center !important; justify-content: center !important;
-        box-shadow: 0px 8px 16px rgba(0,0,0,0.5) !important;
-        transition: transform 0.2s ease-in-out !important;
+    /* IL BOTTONE PLAY VERDE (L'UNICO COLORATO) [cite: 2026-02-25] */
+    .play-btn-pill .stButton button {
+        background-color: #1DB954 !important; 
+        color: #000000 !important;
+        border-radius: 50px !important;
+        width: 50px !important;
+        height: 50px !important;
+        font-size: 22px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-top: -60px !important;
+        margin-left: auto !important;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.5) !important;
+        border: none !important;
     }
-    .play-trigger .stButton button:hover { transform: scale(1.1) !important; background-color: #1ed760 !important; }
+    .play-btn-pill .stButton button:hover { transform: scale(1.1); background-color: #1ed760 !important; }
 
-    /* TRACK LIST (CERCA/LIBRERIA) */
-    .track-row { padding: 10px; border-radius: 8px; display: flex; align-items: center; transition: 0.2s; }
-    .track-row:hover { background-color: #282828; }
+    /* CARD DELLA HOME */
+    .grid-card { background-color: #121212; padding: 15px; border-radius: 10px; transition: 0.3s; height: 100%; border: 1px solid #181818; }
+    .grid-card:hover { background-color: #181818; border-color: #282828; }
+    .img-square { border-radius: 8px; width: 100%; aspect-ratio: 1; object-fit: cover; margin-bottom: 12px; }
+    .card-title { color: white; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
     
-    input { background-color: #242424 !important; color: white !important; border-radius: 500px !important; border: 1px solid #1DB954 !important; padding: 10px 20px !important; }
+    /* TRACK LIST */
+    .track-row { padding: 10px; border-radius: 8px; transition: 0.2s; border-bottom: 1px solid #181818; }
+    .track-row:hover { background-color: #181818; }
+    
+    /* SEARCH BAR */
+    input { background-color: #242424 !important; color: white !important; border-radius: 500px !important; border: 1px solid #1DB954 !important; text-transform: uppercase !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,75 +66,58 @@ ytmusic = YTMusic()
 
 if 'current_view' not in st.session_state: st.session_state.current_view = "🏠 HOME"
 if 'current_url' not in st.session_state: st.session_state.current_url = None
-if 'genre' not in st.session_state: st.session_state.genre = "TOP HITS ITALIA"
 
 def get_db():
     try: return conn.read(ttl=0)
     except: return pd.DataFrame(columns=["TITOLO", "URL", "COPERTINA"])
 
-# MOTORE "FAMOUS ONLY": CERCA SOLO LE LEGGENDE [cite: 2026-02-25]
+# MOTORE HIT REALI: PRENDE LE CLASSIFICHE DI YOUTUBE [cite: 2026-02-25]
 @st.cache_data(ttl=3600)
-def fetch_legendary_content(category):
-    queries = {
-        "TOP HITS ITALIA": "Classifica canzoni Italia 2026",
-        "ROCK": "Best Rock Songs Greatest Hits All Time",
-        "JAZZ": "Miles Davis John Coltrane Best Jazz Hits",
-        "WESTERN": "Ennio Morricone Sergio Leone Western Masterpieces",
-        "NAPOLI": "Grandi Successi Canzone Napoletana Classica",
-        "ANNI 80": "80s Greatest Hits Pop Rock Disco"
-    }
-    q = queries.get(category, f"Top {category} Greatest Hits")
+def get_top_youtube_hits():
     try:
-        return ytmusic.search(q, filter="songs", limit=20)
+        charts = ytmusic.get_charts(country='IT')
+        return charts['trending']['items'] if charts else []
     except:
-        return ytmusic.search("Top Hits World 2026", filter="songs", limit=15)
+        # FALLBACK SE LE CHARTS SONO BLOCCATE: CERCA LE TOP HIT MONDIALI [cite: 2026-02-20]
+        return ytmusic.search("TOP HITS 2026 GLOBAL", filter="songs", limit=15)
 
-# --- SIDEBAR (SPOTIFY NATIVE LAYOUT) ---
+# --- SIDEBAR (PULITA E NERA) ---
 with st.sidebar:
-    st.markdown("### <span style='color:#1DB954'>SIMPATIC</span>-MUSIC", unsafe_allow_html=True)
+    st.markdown("## <span style='color:#1DB954'>SIMPATIC</span>-MUSIC", unsafe_allow_html=True)
     st.write("---")
-    if st.button("🏠 Home"): st.session_state.current_view = "🏠 HOME"; st.rerun()
-    if st.button("🔍 Cerca"): st.session_state.current_view = "🔍 CERCA"; st.rerun()
-    if st.button("🎧 La tua libreria"): st.session_state.current_view = "🎧 LIBRERIA"; st.rerun()
-    st.write("---")
-    st.markdown("#### CATEGORIE")
-    for g in ["TOP HITS ITALIA", "ROCK", "JAZZ", "WESTERN", "NAPOLI", "ANNI 80"]:
-        if st.button(f"🎵 {g}"):
-            st.session_state.genre = g
-            st.session_state.current_view = "🏠 HOME"
-            st.rerun()
+    if st.button("🏠 HOME"): st.session_state.current_view = "🏠 HOME"; st.rerun()
+    if st.button("🔍 CERCA"): st.session_state.current_view = "🔍 CERCA"; st.rerun()
+    if st.button("🎧 LIBRERIA"): st.session_state.current_view = "🎧 LIBRERIA"; st.rerun()
 
 df = get_db()
 
-# --- PLAYER SUPREMO (FISSO IN ALTO) ---
+# --- PLAYER FISSO ---
 if st.session_state.current_url:
     st.video(st.session_state.current_url)
-    if st.button("⏹ CHIUDI PLAYER", key="stop_master"): st.session_state.current_url = None; st.rerun()
+    if st.button("⏹ STOP ASCOLTO"): st.session_state.current_url = None; st.rerun()
     st.write("---")
 
-# === VISTA: HOME (L'ANIMA DI SPOTIFY) ===
+# === VISTA: HOME (SOLO BRANI TOP) ===
 if st.session_state.current_view == "🏠 HOME":
-    st.markdown(f'<div class="section-title">{st.session_state.genre}</div>', unsafe_allow_html=True)
-    items = fetch_legendary_content(st.session_state.genre)
+    st.markdown('<div class="section-title">BRANI DI TENDENZA (YOUTUBE TOP)</div>', unsafe_allow_html=True)
+    items = get_top_youtube_hits()
     
     if items:
-        # GRIGLIA POTENZIATA [cite: 2026-02-25]
         for start in range(0, len(items), 5):
             cols = st.columns(5)
             for i, item in enumerate(items[start:start+5]):
                 with cols[i]:
                     v_id = item.get('videoId') or item.get('id')
                     thumb = item['thumbnails'][-1]['url']
-                    artist = item['artists'][0]['name'] if item.get('artists') else "Artista"
                     st.markdown(f'''
                     <div class="grid-card">
                         <img src="{thumb}" class="img-square">
                         <div class="card-title">{item['title']}</div>
-                        <div class="card-artist">{artist}</div>
                     </div>
                     ''', unsafe_allow_html=True)
-                    # TASTO PLAY VERDE NATIVO (SENZA COSI BIANCHI) [cite: 2026-02-25]
-                    st.markdown('<div class="play-trigger">', unsafe_allow_html=True)
+                    
+                    # BOTTONE PLAY VERDE (SENZA COSI BIANCHI) [cite: 2026-02-25]
+                    st.markdown('<div class="play-btn-pill">', unsafe_allow_html=True)
                     if st.button("▶", key=f"h_{v_id}"):
                         st.session_state.current_url = f"https://www.youtube.com/watch?v={v_id}"
                         st.rerun()
@@ -134,8 +127,8 @@ if st.session_state.current_view == "🏠 HOME":
 
 # === VISTA: CERCA ===
 elif st.session_state.current_view == "🔍 CERCA":
-    st.markdown('<div class="section-title">Cerca</div>', unsafe_allow_html=True)
-    q = st.text_input("", placeholder="Cosa vuoi ascoltare?")
+    st.markdown('<div class="section-title">CERCA NELL\'ABISSO</div>', unsafe_allow_html=True)
+    q = st.text_input("", placeholder="COSA VUOI ASCOLTARE?")
     if q:
         res = ytmusic.search(q, limit=12)
         for r in res:
@@ -155,8 +148,8 @@ elif st.session_state.current_view == "🔍 CERCA":
 
 # === VISTA: LIBRERIA ===
 elif st.session_state.current_view == "🎧 LIBRERIA":
-    st.markdown('<div class="section-title">Libreria</div>', unsafe_allow_html=True)
-    if df.empty: st.info("La tua libreria è vuota.")
+    st.markdown('<div class="section-title">LA TUA DISCOTECA</div>', unsafe_allow_html=True)
+    if df.empty: st.info("CANTIERE VUOTO.")
     else:
         for idx, row in df.iterrows():
             st.markdown('<div class="track-row">', unsafe_allow_html=True)
