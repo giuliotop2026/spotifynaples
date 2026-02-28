@@ -3,7 +3,7 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 
-# PROTOCOLLO GRANITO 8.0: MOTORE SPOTIFY-CLONE, CONTROLLO TOTALE DELLE PARTICELLE
+# PROTOCOLLO GRANITO 8.1: PIAZZATO BLINDATO, ZERO ERRORI DI COLONNE
 st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
 st.markdown("""
@@ -25,7 +25,8 @@ def get_db():
     try:
         return conn.read(ttl=0)
     except:
-        return pd.DataFrame(columns=["TITOLO", "ID_VIDEO"])
+        # COLONNE RIPRISTINATE PER COMBACIARE ESATTAMENTE CON IL TUO DATABASE
+        return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
 # MOTORE BLINDATO: CERCA SOLO LE PARTICELLE ORIGINALI (COME SPOTIFY)
 def search_spotify_like_songs(query):
@@ -38,7 +39,8 @@ def search_spotify_like_songs(query):
             artists = ", ".join([a['name'] for a in res['artists']])
             formatted.append({
                 'id': vid_id,
-                'title': f"{artists} - {title}".upper()
+                'title': f"{artists} - {title}".upper(),
+                'url': f"https://www.youtube.com/watch?v={vid_id}"
             })
         return formatted
     except:
@@ -58,7 +60,7 @@ if menu == "🔍 RICERCA BRANI (DATABASE UFFICIALE)":
     query = st.text_input("INSERISCI LA PARTICELLA DA CERCARE (ES: PINO DANIELE NAPULE E)")
     
     if query:
-        with st.spinner("SCANSIONE IN CORSO CON POLMONI D'ACCIAIO..."):
+        with st.spinner("SCANSIONE IN CORSO CON ACAZZIAM POLMONEI DACCIAAIO E VOGLIA DI VINCERE..."):
             results = search_spotify_like_songs(query)
             if not results:
                 st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE.")
@@ -69,11 +71,12 @@ if menu == "🔍 RICERCA BRANI (DATABASE UFFICIALE)":
                         c1, c2 = st.columns([2, 1])
                         with c1:
                             # ANTEPRIMA PARTICELLA
-                            st.video(f"https://www.youtube.com/watch?v={song['id']}")
+                            st.video(song['url'])
                         with c2:
                             if st.button("💾 AGGIUNGI ALLA CODA DI RIPRODUZIONE", key=f"s_{song['id']}"):
                                 df = get_db()
-                                new_row = pd.DataFrame([{"TITOLO": song['title'], "ID_VIDEO": song['id']}])
+                                # ALLINEAMENTO PERFETTO CON LA TUA SCHEDA GOOGLE (USIAMO 'URL' E 'CATEGORIA')
+                                new_row = pd.DataFrame([{"TITOLO": song['title'], "URL": song['url'], "CATEGORIA": "DISCOTECA"}])
                                 conn.update(data=pd.concat([df, new_row], ignore_index=True).drop_duplicates())
                                 st.success("VINCITORE NASCOSTO AGGIUNTO ALLA DISCOTECA! DENSITÀ MASSIMA!")
 
@@ -81,8 +84,8 @@ else:
     st.title("🎧 LETTORE SIMPATIC-MUSIC - CONTROLLO TOTALE")
     df = get_db()
     
-    if df.empty:
-        st.warning("LA CODA È VUOTA. CERCA DELLE PARTICELLE PER INIZIARE IL FLUSSO.")
+    if df.empty or 'URL' not in df.columns:
+        st.warning("LA CODA È VUOTA O IL CEMENTO NON È ANCORA CONSOLIDATO. CERCA DELLE PARTICELLE PER INIZIARE IL FLUSSO.")
     else:
         # ASSICURIAMO CHE L'INDICE SIA SEMPRE BLINDATO
         if st.session_state.track_index >= len(df):
@@ -93,7 +96,7 @@ else:
         st.markdown(f"### 🎶 IN RIPRODUZIONE ORA: {current_track['TITOLO']}")
         
         # IL LETTORE CENTRALE CHE ESEGUE LA PARTICELLA CORRENTE IN AUTOMATICO
-        st.video(f"https://www.youtube.com/watch?v={current_track['ID_VIDEO']}?autoplay=1")
+        st.video(current_track['URL'])
         
         # CONTROLLI TIPO SPOTIFY: AVANTI E INDIETRO
         col_prev, col_status, col_next = st.columns([1, 2, 1])
