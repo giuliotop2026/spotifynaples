@@ -5,27 +5,24 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 
-# PROTOCOLLO GRANITO 4.0: MOTORE SPOTIFY-LIKE E POLMONI D'ACCIAIO
+# PROTOCOLLO GRANITO 4.1: ZERO FLUSSI BLOCCATI E LINK PRECISI
 st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
-# CSS: ALTA VISIBILITÀ - SFONDO BIANCO, TESTO NERO BOLD
+# CSS CORRETTO: MAI FORZARE IL MAIUSCOLO SUI LINK PER NON GRAFFIARE IL DISCO!
 st.markdown("""
 <style>
     .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
     h1, h2, h3 { color: #007FFF !important; font-weight: 900 !important; text-transform: uppercase !important; }
-    .result-card {
-        background-color: #F8F9FA; padding: 20px; border-radius: 15px; border: 3px solid #007FFF; margin-bottom: 20px; box-shadow: 4px 4px 12px rgba(0,0,0,0.1);
-    }
-    .stButton>button {
-        background-color: #1DB954 !important; color: white !important; border-radius: 30px !important; font-weight: 900 !important; text-transform: uppercase !important; width: 100% !important; border: none !important; height: 55px !important; font-size: 18px !important;
-    }
-    p, span, label, .stMarkdown { color: #000000 !important; font-weight: 900 !important; text-transform: uppercase !important; }
-    input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; }
-    code { color: #007FFF !important; font-weight: bold !important; font-size: 14px !important; text-transform: none !important; }
+    .result-card { background-color: #F8F9FA; padding: 20px; border-radius: 15px; border: 3px solid #007FFF; margin-bottom: 20px; box-shadow: 4px 4px 12px rgba(0,0,0,0.1); }
+    .stButton>button { background-color: #1DB954 !important; color: white !important; border-radius: 30px !important; font-weight: 900 !important; text-transform: uppercase !important; width: 100% !important; border: none !important; height: 55px !important; font-size: 18px !important; }
+    /* MAIUSCOLO SOLO SUI TESTI SICURI */
+    p, label { color: #000000 !important; font-weight: 900 !important; text-transform: uppercase !important; }
+    input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; text-transform: uppercase !important; }
+    /* I LINK TORNANO ORIGINALI E FUNZIONANTI */
+    code, .stCodeBlock * { color: #007FFF !important; font-weight: bold !important; font-size: 14px !important; text-transform: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE E MOTORE MUSICALE UFFICIALE
 conn = st.connection("gsheets", type=GSheetsConnection)
 ytmusic = YTMusic()
 
@@ -35,7 +32,6 @@ def get_db():
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# LA CHIAVE: SCANSIONE SOLO BRANI UFFICIALI (COME SPOTIFY)
 def search_spotify_like(query):
     try:
         search_results = ytmusic.search(query, filter="songs", limit=5)
@@ -53,17 +49,27 @@ def search_spotify_like(query):
     except:
         return []
 
-# ESTRATTORE FLUSSO AUDIO (CEMENTO CHE BLINDA LA RIPRODUZIONE)
-@st.cache_data(show_spinner=False)
+# ESTRATTORE BLINDATO CONTRO IL BAN (POLMONI D'ACCIAIO)
 def get_audio_stream(url):
-    ydl_opts = {'format': 'bestaudio/best', 'quiet': True, 'nocheckcertificate': True}
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'quiet': True,
+        'nocheckcertificate': True,
+        'ignoreerrors': True,
+        'no_warnings': True,
+        # INIEZIONE LETALE: SIMULIAMO CLIENT ANDROID PER BYPASSARE IL BLOCCO
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
-            return ydl.extract_info(url, download=False)['url']
+            info = ydl.extract_info(url, download=False)
+            if info and 'url' in info:
+                return info['url']
+            return None
         except:
             return None
 
-# INTERFACCIA PRINCIPALE
 st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
 st.write("---")
 
@@ -86,7 +92,7 @@ if menu == "🔍 CERCA SINFONIA":
                             if audio_url: 
                                 st.audio(audio_url)
                             else: 
-                                st.error("FLUSSO AUDIO BLOCCATO.")
+                                st.error("ERRORE: FLUSSO AUDIO BLOCCATO DA YOUTUBE.")
                         with c2:
                             if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"s_{vid['id']}"):
                                 df = get_db()
@@ -115,4 +121,4 @@ else:
                     if audio_url: 
                         st.audio(audio_url)
                     else: 
-                        st.error("ERRORE DI RIPRODUZIONE. IL DISCO POTREBBE ESSERE GRAFFIATO.")
+                        st.error("ERRORE DI RIPRODUZIONE: FLUSSO BLOCCATO. IL DISCO POTREBBE ESSERE GRAFFIATO.")
