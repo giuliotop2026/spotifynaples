@@ -1,195 +1,131 @@
 import streamlit as st
 import yt_dlp
 import os
-import io
+import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
 # ==========================================
-# 1. CONFIGURAZIONE E STILE "NAPOLI SPOTIFY"
+# CONFIGURAZIONE E STILE VERDE SPOTIFY
 # ==========================================
-st.set_page_config(page_title="NAPOLI MUSIC HUB", page_icon="💙", layout="wide")
+st.set_page_config(page_title="GREEN MUSIC LOCK", page_icon="🟢", layout="wide")
 
-# Colori Napoli
-AZZURRO_NAPOLI = "#1E90FF" # Un azzurro vivo
-BLU_SCURO = "#001F5B"      # Per gradienti o contrasti
-SFONDO_SCURO = "#121212"  # Sfondo base Spotify
+# FIX 403 & HEADERS PER EVITARE BLOCCHI
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+}
 
-# Iniezione CSS Personalizzato
-st.markdown(f"""
+st.markdown("""
 <style>
-    /* Sfondo generale e testo */
-    .stApp {{
-        background-color: {SFONDO_SCURO};
-        color: white;
-    }}
-
-    /* Input di ricerca stilizzato */
-    div[data-baseweb="input"] input {{
-        background-color: #2A2A2A !important;
-        color: white !important;
+    .stApp { background-color: #121212; color: white; }
+    .stButton>button {
+        background-color: #1DB954 !important;
+        color: black !important;
         border-radius: 20px !important;
-        border: 1px solid transparent !important;
-    }}
-    div[data-baseweb="input"] input:focus {{
-        border: 1px solid {AZZURRO_NAPOLI} !important;
-    }}
-
-    /* Pulsanti (Cerca e Download) */
-    .stButton>button {{
-        background-color: {AZZURRO_NAPOLI} !important;
-        color: white !important;
-        border-radius: 20px !important;
-        border: none !important;
         font-weight: bold !important;
-        transition: all 0.3s ease;
-        width: 100%;
-    }}
-    .stButton>button:hover {{
-        background-color: white !important;
-        color: {BLU_SCURO} !important;
-        transform: scale(1.05);
-    }}
-
-    /* Player Audio */
-    audio {{
-        width: 100%;
-        border-radius: 10px;
-    }}
-
-    /* Titoli */
-    h1, h2, h3, h7 {{
-        color: white !important;
-        font-family: 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }}
-
-    /* Container dei risultati (Simil-Card) */
-    .result-card {{
+        text-transform: uppercase;
+        border: none !important;
+    }
+    .result-card {
         background-color: #181818;
         padding: 20px;
         border-radius: 15px;
-        border: 1px solid #282828;
-        transition: background-color 0.3s ease;
-    }}
-    .result-card:hover {{
-        background-color: #282828;
-    }}
+        border-left: 8px solid #1DB954;
+        margin-bottom: 15px;
+    }
+    h1, h2, h3, p, span, label { text-transform: uppercase !important; font-family: 'sans-serif'; }
+    .stAudio { filter: invert(100%) hue-rotate(90deg); } /* Colora leggermente il player */
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. LOGICA DI BACKEND (YT-DLP)
+# CONNESSIONE DATABASE (GOOGLE SHEETS)
 # ==========================================
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Funzione per cercare e ottenere l'info dello streaming
-@st.cache_data(show_spinner=False)
-def get_stream_info(query):
+def get_db_data():
+    try:
+        return conn.read(ttl=0) # ttl=0 per avere dati sempre freschi
+    except:
+        return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
+
+def save_to_db(title, url, category):
+    df = get_db_data()
+    new_entry = pd.DataFrame([{"TITOLO": title.upper(), "URL": url, "CATEGORIA": category.upper()}])
+    updated_df = pd.concat([df, new_entry], ignore_index=True).drop_duplicates()
+    conn.update(data=updated_df)
+    st.success(f"SALVATO IN {category.upper()}!")
+
+# ==========================================
+# LOGICA AUDIO (YT-DLP)
+# ==========================================
+def search_yt(query):
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
-        'noplaylist': True,
-        'default_search': 'ytsearch',
-        'geo_bypass': True,
+        'http_headers': HEADERS,
+        'default_search': 'ytsearch10', # CERCA 10 RISULTATI
+        'nocheckcertificate': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(query, download=False)
-        if 'entries' in info:
-            info = info['entries'][0]
-        return {
-            'id': info.get('id'),
-            'title': info.get('title', 'TITOLO SCONOSCIUTO'),
-            'url': info.get('url'), # URL Streaming diretto
-            'thumb': info.get('thumbnail'),
-            'duration': info.get('duration'),
-            'webpage_url': info.get('webpage_url')
-        }
+        return info['entries'] if 'entries' in info else [info]
 
-# Funzione per scaricare l'MP3 effettivo (per l'offline)
-def download_mp3_binary(video_url):
-    # Cartella temporanea sul server Streamlit
-    download_path = 'temp_download.mp3'
-
+def download_file(url):
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': 'temp_download.%(ext)s', # Salva temporaneamente
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+        'outtmpl': 'temp_music.%(ext)s',
+        'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
         'quiet': True,
     }
-
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
-
-    # Leggi il file in binario
-    with open('temp_download.mp3', 'rb') as f:
+        ydl.download([url])
+    with open('temp_music.mp3', 'rb') as f:
         data = f.read()
-
-    # Pulizia: rimuovi il file temporaneo sul server
-    os.remove('temp_download.mp3')
-
+    os.remove('temp_music.mp3')
     return data
 
 # ==========================================
-# 3. INTERFACCIA UTENTE
+# INTERFACCIA PRINCIPALE
 # ==========================================
+st.sidebar.title("🟢 MENU MUSIC LOCK")
+page = st.sidebar.radio("VAI A:", ["RICERCA", "LA MIA LIBRERIA"])
 
-# Sidebar simulata (stile Spotify)
-with st.sidebar:
-    st.markdown(f"<h1 style='color:{AZZURRO_NAPOLI}; text-align:center;'>💙 NAPOLI<br>MUSIC HUB</h1>", unsafe_allow_html=True)
-    st.write("---")
-    st.write("🎵 La tua musica.")
-    st.write("🚫 Zero Pubblicità.")
-    st.write("⬇️ Download Offline.")
-    st.write("---")
-    st.caption("Forza Napoli Sempre.")
+if page == "RICERCA":
+    st.title("🔍 CERCA LA TUA MUSICA")
+    query = st.text_input("INSERISCI NOME CANZONE O ARTISTA")
+    
+    if query:
+        with st.spinner("SCANSIONE DATABASE YOUTUBE..."):
+            results = search_yt(query)
+            for vid in results:
+                with st.container():
+                    st.markdown(f'<div class="result-card"><h3>{vid["title"].upper()}</h3></div>', unsafe_allow_html=True)
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.audio(vid['url'])
+                    with c2:
+                        cat = st.selectbox("CATEGORIA", ["PREFERITI", "PLAYLIST 1", "PLAYLIST 2"], key=f"sel_{vid['id']}")
+                        if st.button("💾 SALVA", key=f"btn_{vid['id']}"):
+                            save_to_db(vid['title'], vid['webpage_url'], cat)
+                        
+                        if st.button("⬇️ PREPARA MP3", key=f"dl_{vid['id']}"):
+                            mp3 = download_file(vid['webpage_url'])
+                            st.download_button("SCARICA ORA", mp3, f"{vid['title']}.mp3")
 
-# Area Principale
-st.markdown("<h3>🔍 Cerca il tuo brano</h3>", unsafe_allow_html=True)
-SEARCH_QUERY = st.text_input("", placeholder="Artista, canzone, album...", label_visibility="collapsed")
-
-if SEARCH_QUERY:
-    try:
-        with st.spinner("⏳ Sintonizzazione sui server..."):
-            DATA = get_stream_info(SEARCH_QUERY)
-
-            # Layout Risultati a colonne
-            col_thumb, col_play = st.columns([1, 3])
-
-            with col_thumb:
-                st.image(DATA['thumb'], use_container_width=True)
-
-            with col_play:
-                # Container stilizzato CSS
-                st.markdown(f"""
-                <div class="result-card">
-                    <h7 style="color:gray;">BRANO</h7>
-                    <h2 style="margin-top:0;">{DATA['title']}</h2>
-                    <p style="color:gray;">Durata: {DATA['duration'] // 60}:{DATA['duration'] % 60:02d}</p>
-                </div>
-                <br>
-                """, unsafe_allow_html=True)
-
-                # PLAYER AUDIO DIRETTO (Streaming online)
-                st.audio(DATA['url'], format='audio/mp3')
-
-                st.write("---")
-                # SEZIONE DOWNLOAD (Per Offline)
-                st.markdown("<h4>⬇️ Salva per l'ascolto offline</h4>", unsafe_allow_html=True)
-                st.caption("Il browser scaricherà il file MP3 sul tuo dispositivo.")
-
-                # Bottone che attiva il download vero e proprio
-                if st.button("PREPARA FILE MP3"):
-                    with st.spinner("🔄 Conversione in MP3 in corso (potrebbe richiedere un minuto)..."):
-                        mp3_data = download_mp3_binary(DATA['webpage_url'])
-
-                        # Il vero bottone di download del browser apparirà ora
-                        st.download_button(
-                            label="⬇️ CLICCA QUI PER SCARICARE MP3",
-                            data=mp3_data,
-                            file_name=f"{DATA['title']}.mp3",
-                            mime="audio/mp3"
-                        )
-
-    except Exception as e:
-        st.error(f"⚠️ Errore durante il recupero: {e}")
+else:
+    st.title("📂 LIBRERIA SALVATA")
+    df_saved = get_db_data()
+    if df_saved.empty:
+        st.info("LA TUA LIBRERIA È VUOTA. INIZIA A SALVARE BRANI!")
+    else:
+        categorie = ["TUTTE"] + df_saved['CATEGORIA'].unique().tolist()
+        scelta = st.selectbox("FILTRA PER CATEGORIA", categorie)
+        
+        filtered = df_saved if scelta == "TUTTE" else df_saved[df_saved['CATEGORIA'] == scelta]
+        
+        for _, row in filtered.iterrows():
+            with st.expander(f"🎵 {row['TITOLO']}"):
+                if st.button("RIPRODUCI ORA", key=f"play_{row['URL']}"):
+                    # Ricarica l'URL fresco per evitare scadenza link YT
+                    fresh_info = search_yt(row['URL'])[0]
+                    st.audio(fresh_info['url'])
