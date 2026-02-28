@@ -60,7 +60,7 @@ df = get_db()
 
 # --- LOGICA VISUALIZZAZIONE ---
 if st.session_state.current_view == "🔍 SCOPRI":
-    st.title("CERCA SINFONIE [cite: 2026-02-21]")
+    st.title("CERCA SINFONIE ")
     
     # PLAYER MASTER PER SCOPRI [cite: 2026-02-25]
     if st.session_state.current_url:
