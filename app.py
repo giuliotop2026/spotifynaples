@@ -3,7 +3,7 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 
-# PROTOCOLLO GRANITO 6.0: SINFONIA CONTINUA E FLUSSO INARRESTABILE
+# PROTOCOLLO GRANITO 7.0: RICERCA PLAYLIST UFFICIALI E FLUSSO SPOTIFY
 st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
 st.markdown("""
@@ -17,7 +17,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CONNESSIONE DATABASE E MOTORE MUSICALE UFFICIALE
 conn = st.connection("gsheets", type=GSheetsConnection)
 ytmusic = YTMusic()
 
@@ -25,108 +24,90 @@ def get_db():
     try:
         return conn.read(ttl=0)
     except:
-        return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
+        return pd.DataFrame(columns=["TITOLO", "ID_PLAYLIST"])
 
-def search_spotify_like(query):
+# LA NUOVA CHIAVE: CERCARE SOLO PLAYLIST PER AVERE CENTINAIA DI BRANI ORIGINALI
+def search_official_playlists(query):
     try:
-        search_results = ytmusic.search(query, filter="songs", limit=5)
+        # filter="playlists" assicura che troviamo solo raccolte ufficiali
+        search_results = ytmusic.search(query, filter="playlists", limit=5)
         formatted = []
         for res in search_results:
-            vid_id = res['videoId']
+            play_id = res['browseId']
+            # Rimuove il prefisso 'VL' che a volte YT Music aggiunge alle playlist
+            if play_id.startswith("VL"):
+                play_id = play_id[2:]
+            
             title = res['title']
-            artists = ", ".join([a['name'] for a in res['artists']])
+            author = res.get('author', 'Artisti Vari')
             formatted.append({
-                'id': vid_id,
-                'title': f"{artists} - {title}".upper(),
-                'webpage_url': f"https://www.youtube.com/watch?v={vid_id}"
+                'id': play_id,
+                'title': f"{author} - {title}".upper()
             })
         return formatted
     except:
         return []
 
-# ESTRATTORE DELLA PARTICELLA ID PER IL LETTORE SUPREMO
-def extract_video_id(url):
-    if "v=" in str(url):
-        return str(url).split("v=")[1].split("&")[0]
-    return None
-
 st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
 st.write("---")
 
-menu = st.sidebar.radio("SALA REGIA", ["🔍 CERCA SINFONIA", "📂 LA TUA DISCOTECA"])
+menu = st.sidebar.radio("SALA REGIA", ["🔍 CERCA PLAYLIST (STILE SPOTIFY)", "📂 LE TUE PLAYLIST SALVATE"])
 
-if menu == "🔍 CERCA SINFONIA":
-    query = st.text_input("INSERISCI L'ARTISTA O LA TRACCIA (MAIUSCOLO)")
+if menu == "🔍 CERCA PLAYLIST (STILE SPOTIFY)":
+    st.markdown("### TROVA ORE DI MUSICA CONTINUA")
+    query = st.text_input("CERCA UN ARTISTA, UN GENERE O UNA CLASSIFICA (ES: PINO DANIELE, TOP 50, POP ITALIANO)")
+    
     if query:
-        with st.spinner("ACCORDANDO GLI STRUMENTI. SCANSIONE DELL'ABISSO IN CORSO..."):
-            results = search_spotify_like(query)
+        with st.spinner("SCANSIONE DELLE PLAYLIST UFFICIALI IN CORSO..."):
+            results = search_official_playlists(query)
             if not results:
-                st.error("ERRORE: NESSUN ACCORDO UFFICIALE TROVATO.")
+                st.error("ERRORE: NESSUNA PLAYLIST TROVATA. CEMENTO INSTABILE.")
             else:
-                for vid in results:
+                for play in results:
                     with st.container():
-                        st.markdown(f'<div class="result-card"><h3>{vid["title"]}</h3></div>', unsafe_allow_html=True)
-                        c1, c2, c3 = st.columns([2, 1, 1])
+                        st.markdown(f'<div class="result-card"><h3>{play["title"]}</h3></div>', unsafe_allow_html=True)
+                        c1, c2 = st.columns([2, 1])
+                        
                         with c1:
-                            st.video(vid['webpage_url'])
+                            # IL LETTORE SUPREMO INCORPORATO DIRETTAMENTE NELLA RICERCA
+                            iframe_code = f'''
+                            <iframe width="100%" height="350" 
+                            src="https://www.youtube.com/embed/videoseries?list={play['id']}&autoplay=0" 
+                            title="SIMPATIC-MUSIC PLAYER" frameborder="0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen></iframe>
+                            '''
+                            st.markdown(iframe_code, unsafe_allow_html=True)
+                            
                         with c2:
-                            if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"s_{vid['id']}"):
+                            if st.button("💾 SALVA PLAYLIST NELLA DISCOTECA", key=f"s_{play['id']}"):
                                 df = get_db()
-                                new_row = pd.DataFrame([{"TITOLO": vid['title'], "URL": vid['webpage_url'], "CATEGORIA": "DISCOTECA"}])
+                                new_row = pd.DataFrame([{"TITOLO": play['title'], "ID_PLAYLIST": play['id']}])
                                 conn.update(data=pd.concat([df, new_row], ignore_index=True).drop_duplicates())
-                                st.success("TRACCIA REGISTRATA CON DENSITÀ MASSIMA!")
-                        with c3:
-                            st.write("**1️⃣ COPIA IL LINK DEL DISCO:**")
-                            st.code(vid['webpage_url'], language="text")
-                            st.write("**2️⃣ VAI IN SALA INCISIONE:**")
-                            notube_correct = "https://notube.link/it/youtube-app-317"
-                            st.markdown(f'<a href="{notube_correct}" target="_blank"><button style="width:100%; height:45px; background-color:#007FFF; color:white; border-radius:20px; border:none; font-weight:900; cursor:pointer; text-transform:uppercase;">⬇️ SCARICA MP3</button></a>', unsafe_allow_html=True)
+                                st.success("PLAYLIST REGISTRATA CON DENSITÀ MASSIMA!")
 
 else:
-    st.title("📂 LA TUA DISCOTECA - FLUSSO CONTINUO")
+    st.title("📂 LE TUE PLAYLIST - FLUSSO CONTINUO")
     df = get_db()
     
     if df.empty:
-        st.warning("LA DISCOTECA È VUOTA. INIZIA A COMPORRE LO SPARTITO.")
+        st.warning("LA TUA DISCOTECA È VUOTA. CERCA UNA PLAYLIST PER INIZIARE.")
     else:
-        # ---------------------------------------------------------
-        # IL LETTORE SUPREMO: COSTRUISCE LA PLAYLIST AUTOMATICA
-        # ---------------------------------------------------------
-        st.markdown("### 📻 LETTORE SUPREMO (PLAYLIST AUTOMATICA)")
-        
-        video_ids = []
-        for url in df['URL'].dropna():
-            vid = extract_video_id(url)
-            if vid:
-                video_ids.append(vid)
-        
-        if video_ids:
-            first_video = video_ids[0]
-            # Unisce tutti gli altri video in una stringa separata da virgole
-            playlist_string = ",".join(video_ids[1:]) if len(video_ids) > 1 else ""
-            
-            # Genera il player iframe blindato
-            iframe_code = f'''
-            <iframe width="100%" height="400" 
-            src="https://www.youtube.com/embed/{first_video}?playlist={playlist_string}&autoplay=0&controls=1&loop=1" 
-            title="SIMPATIC-MUSIC PLAYER" frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen></iframe>
-            '''
-            st.markdown(iframe_code, unsafe_allow_html=True)
-            st.success("FLUSSO AGGANCIATO. USA I TASTI NEL VIDEO PER PASSARE AL BRANO SUCCESSIVO O PRECEDENTE.")
-        
-        st.write("---")
-        st.markdown("### 🎼 GESTIONE SINGOLE TRACCE")
-        
         for i, row in df.iterrows():
             with st.expander(f"🎵 {row['TITOLO']}"):
-                st.write("**COPIA IL LINK DELLA TRACCIA:**")
-                st.code(row['URL'], language="text")
+                # IL LETTORE SUPREMO NELLA LIBRERIA
+                iframe_code = f'''
+                <iframe width="100%" height="350" 
+                src="https://www.youtube.com/embed/videoseries?list={row['ID_PLAYLIST']}&autoplay=0" 
+                title="SIMPATIC-MUSIC PLAYER" frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen></iframe>
+                '''
+                st.markdown(iframe_code, unsafe_allow_html=True)
                 
-                # TASTO ROSSO PER DISINTEGRARE LA PARTICELLA DAL DATABASE
+                # TASTO ROSSO PER DISINTEGRARE LA PLAYLIST DAL DATABASE
                 st.markdown('<div class="btn-delete">', unsafe_allow_html=True)
-                if st.button("❌ ELIMINA DALLA DISCOTECA", key=f"del_{i}"):
+                if st.button("❌ ELIMINA PLAYLIST", key=f"del_{i}"):
                     df_updated = df.drop(index=i)
                     conn.update(data=df_updated)
                     st.rerun()
