@@ -4,7 +4,7 @@ from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
 import urllib.parse
 
-# PROTOCOLLO GRANITO 11.0: MOTORE ASSOCIATIVO SPOTIFY-LIKE E ZERO CRASH
+# PROTOCOLLO GRANITO 12.0: MOTORE SEMANTICO E NAVIGAZIONE FLUIDA [cite: 2026-02-25]
 st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
 
 st.markdown("""
@@ -28,79 +28,31 @@ def get_db():
     except:
         return pd.DataFrame(columns=["TITOLO", "URL", "CATEGORIA"])
 
-# MOTORE 1: BRANI SINGOLI
-def search_songs(query):
-    if "youtube.com" in query or "youtu.be" in query:
-        parsed = urllib.parse.urlparse(query)
-        qs = urllib.parse.parse_qs(parsed.query)
-        if 'v' in qs:
-            vid = qs['v'][0]
-            return [{'id': vid, 'title': f"BRANO: LINK INSERITO MANUALMENTE", 'url': f"https://www.youtube.com/watch?v={vid}"}]
-        elif "youtu.be/" in query:
-            vid = query.split("youtu.be/")[1].split("?")[0]
-            return [{'id': vid, 'title': f"BRANO: LINK INSERITO MANUALMENTE", 'url': f"https://www.youtube.com/watch?v={vid}"}]
-            
+# MOTORE SEMANTICO: TROVA TUTTO CIÒ CHE È ASSOCIATO AL NOME [cite: 2026-02-20]
+def search_universal(query, filter_type):
     try:
-        search_results = ytmusic.search(query, filter="songs", limit=8)
-        formatted = []
-        for res in search_results:
-            artists = res.get('artists', [{'name': 'Artista Sconosciuto'}])
-            artist_name = ", ".join([a.get('name', '') for a in artists if isinstance(a, dict)])
-            title = res.get('title', 'Senza Titolo')
-            formatted.append({
-                'id': res['videoId'],
-                'title': f"{artist_name} - {title}".upper(),
-                'url': f"https://www.youtube.com/watch?v={res['videoId']}"
-            })
-        return formatted
-    except:
-        return []
-
-# MOTORE 2: PLAYLIST ASSOCIATIVE (IL VERO SEGRETO DI SPOTIFY)
-def search_playlists(query):
-    # BYPASS LINK DIRETTO
-    if "list=" in query:
-        parsed = urllib.parse.urlparse(query)
-        qs = urllib.parse.parse_qs(parsed.query)
-        if 'list' in qs:
-            play_id = qs['list'][0]
-            if play_id.startswith("VL"): play_id = play_id[2:]
-            return [{'id': play_id, 'title': f"PLAYLIST: INSERITA MANUALMENTE", 'url': f"https://www.youtube.com/playlist?list={play_id}"}]
-            
-    try:
-        # INIEZIONE ASSOCIATIVA: AGGIUNGIAMO "PLAYLIST" SE NON C'È GIÀ PER FORZARE I RISULTATI TEMATICI
-        search_query = query if "playlist" in query.lower() else f"{query} playlist"
+        # Se è un link diretto, bypassiamo la ricerca [cite: 2026-02-25]
+        if "youtube.com" in query or "youtu.be" in query:
+             return [{'id': 'manual', 'title': 'LINK DIRETTO', 'url': query, 'is_playlist': 'list=' in query}]
         
-        # SCANSIONIAMO PRIMA LA COMMUNITY PER TROVARE ASSOCIAZIONI (ES. "ROCKY WORKOUT")
-        search_results = ytmusic.search(search_query, filter="community_playlists", limit=8)
-        
-        # SE LA COMMUNITY NON HA NULLA, SCANSIONIAMO QUELLE UFFICIALI
-        if not search_results:
-            search_results = ytmusic.search(search_query, filter="playlists", limit=8)
-            
+        # Scansione dell'abisso senza filtri restrittivi iniziali per massima densità [cite: 2026-02-20]
+        search_results = ytmusic.search(query, filter=filter_type, limit=12)
         formatted = []
         for res in search_results:
             try:
-                play_id = res.get('browseId', '')
-                if not play_id: continue
-                if play_id.startswith("VL"): play_id = play_id[2:]
-                
-                author_data = res.get('author', 'Community')
-                if isinstance(author_data, list):
-                    author = ", ".join([a.get('name', '') for a in author_data if isinstance(a, dict)])
+                if filter_type == "songs":
+                    artists = res.get('artists', [{'name': 'Artista Sconosciuto'}])
+                    name = f"{artists[0]['name']} - {res['title']}".upper()
+                    url = f"https://www.youtube.com/watch?v={res['videoId']}"
+                    item_id = res['videoId']
                 else:
-                    author = str(author_data)
-                    
-                title = res.get('title', 'Playlist Sconosciuta')
-                formatted.append({
-                    'id': play_id,
-                    'title': f"PLAYLIST: {author} - {title}".upper(),
-                    'url': f"https://www.youtube.com/playlist?list={play_id}"
-                })
-            except Exception:
-                # CEMENTO ANTI-CRASH: SE UNA PLAYLIST HA DATI CORROTTI, LA IGNORA E PASSA OLTRE
-                continue
+                    name = f"PLAYLIST: {res['title']}".upper()
+                    item_id = res.get('browseId', res.get('playlistId', ''))
+                    if item_id.startswith("VL"): item_id = item_id[2:]
+                    url = f"https://www.youtube.com/playlist?list={item_id}"
                 
+                formatted.append({'id': item_id, 'title': name, 'url': url, 'is_playlist': filter_type != "songs"})
+            except: continue
         return formatted
     except Exception:
         return []
@@ -108,115 +60,90 @@ def search_playlists(query):
 st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
 st.write("---")
 
-if 'track_index' not in st.session_state:
-    st.session_state.track_index = 0
+# MEMORIA DI SESSIONE PER IL PLAYER SPOTIFY-STYLE [cite: 2026-02-25]
+if 'track_index' not in st.session_state: st.session_state.track_index = 0
 
-menu = st.sidebar.radio("SALA REGIA", ["🔍 RICERCA BRANI E PLAYLIST", "🎧 LA TUA DISCOTECA"])
+menu = st.sidebar.radio("SALA REGIA", ["🔍 SCOPRI E CERCA", "🎧 LA TUA DISCOTECA"])
 
-if menu == "🔍 RICERCA BRANI E PLAYLIST":
-    st.markdown("### SCANSIONA L'ABISSO DEL DATABASE MUSICALE")
+if menu == "🔍 SCOPRI E CERCA":
+    st.markdown("### CERCA BRANI O PLAYLIST ASSOCIATE")
     
-    tipo_ricerca = st.radio("SELEZIONA IL FLUSSO CHE DESIDERI:", ["🎵 BRANO SINGOLO (Stile Spotify)", "📁 PLAYLIST INTERA E ASSOCIATIVA"], horizontal=True)
-    
-    st.write("PUOI SCRIVERE IL NOME (ES: ROCKY) OPPURE INCOLLARE DIRETTAMENTE IL LINK DI YOUTUBE!")
-    query = st.text_input("INSERISCI TESTO O LINK YOUTUBE:")
-    
+    col1, col2 = st.columns(2)
+    with col1:
+        tipo = st.selectbox("COSA CERCHIAMO?", ["BRANI SINGOLI", "PLAYLIST E RACCOLTE"])
+    with col2:
+        query = st.text_input("INSERISCI NOME O LINK YOUTUBE:")
+
     if query:
-        with st.spinner("SCANSIONE IN CORSO CON ACAZZIAM POLMONEI DACCIAAIO E VOGLIA DI VINCERE..."):
-            if "SINGOLO" in tipo_ricerca:
-                results = search_songs(query)
-                is_playlist = False
-            else:
-                results = search_playlists(query)
-                is_playlist = True
-                
+        f_type = "songs" if tipo == "BRANI SINGOLI" else "playlists"
+        with st.spinner("SCANSIONE CON POLMONI D'ACCIAIO... [cite: 2026-02-18]"):
+            results = search_universal(query, f_type)
             if not results:
-                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. CEMENTO INSTABILE O NOME TROPPO GENERICO.")
+                st.error("ERRORE: NESSUNA PARTICELLA TROVATA. PROVA UN TERMINE PIÙ AMPIO [cite: 2026-02-20].")
             else:
                 for item in results:
                     with st.container():
                         st.markdown(f'<div class="result-card"><h3>{item["title"]}</h3></div>', unsafe_allow_html=True)
                         c1, c2 = st.columns([2, 1])
                         with c1:
-                            if is_playlist:
-                                iframe_code = f'<iframe width="100%" height="250" src="https://www.youtube.com/embed/videoseries?list={item["id"]}" frameborder="0" allowfullscreen></iframe>'
-                                st.markdown(iframe_code, unsafe_allow_html=True)
+                            if item['is_playlist']:
+                                pid = item['url'].split("list=")[-1]
+                                st.markdown(f'<iframe width="100%" height="300" src="https://www.youtube.com/embed/videoseries?list={pid}" frameborder="0" allowfullscreen></iframe>', unsafe_allow_html=True)
                             else:
                                 st.video(item['url'])
                         with c2:
-                            if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"s_{item['id']}"):
+                            if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"s_{item['id']}_{item['title']}"):
                                 df = get_db()
-                                categoria = "PLAYLIST" if is_playlist else "SINGOLO"
-                                new_row = pd.DataFrame([{"TITOLO": item['title'], "URL": item['url'], "CATEGORIA": categoria}])
+                                cat = "PLAYLIST" if item['is_playlist'] else "SINGOLO"
+                                new_row = pd.DataFrame([{"TITOLO": item['title'], "URL": item['url'], "CATEGORIA": cat}])
                                 conn.update(data=pd.concat([df, new_row], ignore_index=True).drop_duplicates())
-                                st.success(f"{categoria} SALVATO CON DENSITÀ MASSIMA!")
+                                st.success("AGGIUNTO CON DENSITÀ MASSIMA! [cite: 2026-02-20]")
 
 else:
-    st.title("🎧 LA TUA DISCOTECA - CONTROLLO TOTALE")
+    st.title("🎧 LA TUA DISCOTECA - FLUSSO CONTINUO [cite: 2026-02-21]")
     df = get_db()
     
-    if df.empty or 'URL' not in df.columns:
-        st.warning("LA DISCOTECA È VUOTA. CERCA DELLE PARTICELLE PER INIZIARE.")
+    if df.empty:
+        st.warning("IL CANTIERE È VUOTO. CERCA DELLE PARTICELLE PER INIZIARE [cite: 2026-02-20].")
     else:
-        df_singoli = df[~df['URL'].str.contains('list=')]
-        df_playlist = df[df['URL'].str.contains('list=')]
+        df_singoli = df[df['CATEGORIA'] == "SINGOLO"]
+        df_playlist = df[df['CATEGORIA'] == "PLAYLIST"]
         
-        # LETTORE SINGOLI BRANI
         if not df_singoli.empty:
-            st.markdown("### 🎵 CODA DI RIPRODUZIONE BRANI SINGOLI")
+            st.markdown("### 🎵 PLAYER SPOTIFY-STYLE (BRANI SINGOLI)")
+            if st.session_state.track_index >= len(df_singoli): st.session_state.track_index = 0
             
-            if st.session_state.track_index >= len(df_singoli):
-                st.session_state.track_index = 0
-                
-            current_track = df_singoli.iloc[st.session_state.track_index]
-            st.markdown(f"#### IN RIPRODUZIONE ORA: {current_track['TITOLO']}")
-            st.video(current_track['URL'])
+            curr = df_singoli.iloc[st.session_state.track_index]
+            st.markdown(f"#### ORA IN ONDA: {curr['TITOLO']}")
+            st.video(curr['URL'])
             
-            col_prev, col_status, col_next = st.columns([1, 2, 1])
-            with col_prev:
-                st.markdown('<div class="btn-control">', unsafe_allow_html=True)
-                if st.button("⏮ BRANO PRECEDENTE", key="prev"):
-                    st.session_state.track_index = st.session_state.track_index - 1 if st.session_state.track_index > 0 else len(df_singoli) - 1
+            c_p, c_s, c_n = st.columns([1, 2, 1])
+            with c_p:
+                if st.button("⏮ PRECEDENTE"):
+                    st.session_state.track_index = (st.session_state.track_index - 1) % len(df_singoli)
                     st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-            with col_status:
-                st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 20px; margin-top: 10px;'>TRACCIA {st.session_state.track_index + 1} DI {len(df_singoli)}</div>", unsafe_allow_html=True)
-            with col_next:
-                st.markdown('<div class="btn-control">', unsafe_allow_html=True)
-                if st.button("⏭ BRANO SUCCESSIVO", key="next"):
-                    st.session_state.track_index = st.session_state.track_index + 1 if st.session_state.track_index < len(df_singoli) - 1 else 0
+            with c_s:
+                st.write(f"TRACCIA {st.session_state.track_index + 1} / {len(df_singoli)}")
+            with c_n:
+                if st.button("⏭ SUCCESSIVO"):
+                    st.session_state.track_index = (st.session_state.track_index + 1) % len(df_singoli)
                     st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
             
-            st.write("---")
-            for idx, row in df_singoli.iterrows():
-                rel_pos = df_singoli.index.get_loc(idx)
-                with st.expander(f"{'▶️' if rel_pos == st.session_state.track_index else '🎵'} {row['TITOLO']}"):
-                    c_jump, c_del = st.columns(2)
-                    with c_jump:
-                        if st.button("▶️ SALTA A QUESTA TRACCIA", key=f"jump_{idx}"):
-                            st.session_state.track_index = rel_pos
-                            st.rerun()
-                    with c_del:
-                        st.markdown('<div class="btn-delete">', unsafe_allow_html=True)
-                        if st.button("❌ ELIMINA", key=f"del_{idx}"):
-                            conn.update(data=df.drop(index=idx))
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.write("---")
-        
-        # LETTORE PLAYLIST
-        if not df_playlist.empty:
-            st.markdown("### 📁 LE TUE PLAYLIST SALVATE")
-            for idx, row in df_playlist.iterrows():
-                with st.expander(f"📁 {row['TITOLO']}"):
-                    play_id = row['URL'].split("list=")[-1]
-                    iframe_code = f'<iframe width="100%" height="350" src="https://www.youtube.com/embed/videoseries?list={play_id}" frameborder="0" allowfullscreen></iframe>'
-                    st.markdown(iframe_code, unsafe_allow_html=True)
-                    
-                    st.markdown('<div class="btn-delete">', unsafe_allow_html=True)
-                    if st.button("❌ ELIMINA PLAYLIST", key=f"del_play_{idx}"):
+            with st.expander("VEDI TUTTA LA CODA"):
+                for idx, row in df_singoli.iterrows():
+                    col_t, col_d = st.columns([4, 1])
+                    col_t.write(f"{row['TITOLO']}")
+                    if col_d.button("❌", key=f"del_{idx}"):
                         conn.update(data=df.drop(index=idx))
                         st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+
+        if not df_playlist.empty:
+            st.write("---")
+            st.markdown("### 📁 LE TUE PLAYLIST E RACCOLTE")
+            for idx, row in df_playlist.iterrows():
+                with st.expander(f"📁 {row['TITOLO']}"):
+                    pid = row['URL'].split("list=")[-1]
+                    st.markdown(f'<iframe width="100%" height="350" src="https://www.youtube.com/embed/videoseries?list={pid}" frameborder="0" allowfullscreen></iframe>', unsafe_allow_html=True)
+                    if st.button("ELIMINA PLAYLIST", key=f"del_p_{idx}"):
+                        conn.update(data=df.drop(index=idx))
+                        st.rerun()
