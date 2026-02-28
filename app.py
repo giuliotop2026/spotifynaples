@@ -2,20 +2,38 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from ytmusicapi import YTMusic
-import yt_dlp
 
-# PROTOCOLLO GRANITO 15.1: COPIA RAPIDA E OFFLINE READY [cite: 2026-02-25]
-st.set_page_config(page_title="SIMPATIC-MUSIC LA MUSICA E LIBERTA", layout="wide")
+# PROTOCOLLO GRANITO 16.0: INTERFACCIA NATIVA DARK MODE [cite: 2026-02-25]
+st.set_page_config(page_title="SIMPATIC-MUSIC", layout="wide", initial_sidebar_state="collapsed")
 
+# CSS: SPOTIFY DARK DESIGN - NERO PROFONDO E VERDE [cite: 2026-01-20]
 st.markdown("""
 <style>
-    .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
-    h1, h2, h3 { color: #007FFF !important; font-weight: 900 !important; text-transform: uppercase !important; }
-    .result-card { background-color: #F8F9FA; padding: 20px; border-radius: 15px; border: 3px solid #007FFF; margin-bottom: 20px; }
-    .stButton>button { background-color: #1DB954 !important; color: white !important; border-radius: 30px !important; font-weight: 900 !important; text-transform: uppercase !important; width: 100% !important; height: 50px !important; }
-    input { color: #000000 !important; font-weight: 900 !important; border: 2px solid #007FFF !important; text-transform: uppercase !important; }
-    /* STILE PER IL LINK DA COPIARE */
-    code { color: #007FFF !important; font-weight: bold !important; font-size: 16px !important; }
+    .stApp { background-color: #121212 !important; color: #FFFFFF !important; }
+    h1, h2, h3 { color: #1DB954 !important; font-weight: 900 !important; text-transform: uppercase !important; }
+    
+    /* CARTE DEI BRANI TIPO SPOTIFY */
+    .result-card { 
+        background-color: #181818; padding: 15px; border-radius: 10px; 
+        border-left: 5px solid #1DB954; margin-bottom: 15px;
+    }
+    
+    /* BOTTONI ROTONDI NATIVI */
+    .stButton>button { 
+        background-color: #1DB954 !important; color: white !important; 
+        border-radius: 50px !important; font-weight: 900 !important; 
+        height: 50px !important; border: none !important;
+    }
+    
+    /* INPUT DARK */
+    input { 
+        background-color: #282828 !important; color: white !important; 
+        border: 1px solid #1DB954 !important; border-radius: 10px !important;
+    }
+    
+    /* TESTI E CODICE */
+    p, label { color: #B3B3B3 !important; font-weight: 700 !important; text-transform: uppercase !important; }
+    code { background-color: #282828 !important; color: #1DB954 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,70 +59,54 @@ def search_hybrid(query):
         return formatted
     except: return []
 
-st.title("🎵 SIMPATIC-MUSIC: LA MUSICA È LIBERTÀ")
+# NAVIGAZIONE TIPO APP (BARRA LATERALE NASCOSTA)
+st.title("🎵 SIMPATIC-MUSIC")
+menu = st.tabs(["🔍 CERCA", "🎧 LIBRERIA", "📥 DOWNLOAD"])
 
-if 'track_idx' not in st.session_state: st.session_state.track_idx = 0
-
-menu = st.sidebar.radio("SALA REGIA", ["🔍 SCOPRI E CERCA", "🎧 DISCOTECA (COPIA E SCARICA)"])
-
-if menu == "🔍 SCOPRI E CERCA":
-    query = st.text_input("CERCA BRANI DA AGGIUNGERE (MAIUSCOLO) [cite: 2026-01-20]")
+# --- TAB 1: RICERCA ---
+with menu[0]:
+    query = st.text_input("COSA VUOI ASCOLTARE?", placeholder="ARTISTA O BRANO...")
     if query:
-        with st.spinner("SCANSIONE IN CORSO..."):
-            results = search_hybrid(query)
-            for item in results:
-                with st.container():
-                    st.markdown(f'<div class="result-card"><h3>{item["title"]}</h3></div>', unsafe_allow_html=True)
-                    c1, c2 = st.columns([2, 1])
-                    with c1: st.video(item['url'])
-                    with c2:
-                        if st.button("💾 AGGIUNGI ALLA DISCOTECA", key=f"add_{item['id']}"):
-                            df = get_db()
-                            new_row = pd.DataFrame([{"TITOLO": item['title'], "URL": item['url'], "CATEGORIA": "SINGOLO"}])
-                            conn.update(data=pd.concat([df, new_row], ignore_index=True).drop_duplicates())
-                            st.success("SALVATO!")
+        results = search_hybrid(query)
+        for item in results:
+            with st.container():
+                st.markdown(f'<div class="result-card"><h3>{item["title"]}</h3></div>', unsafe_allow_html=True)
+                st.video(item['url'])
+                if st.button("➕ AGGIUNGI AI PREFERITI", key=f"add_{item['id']}"):
+                    df = get_db()
+                    new_row = pd.DataFrame([{"TITOLO": item['title'], "URL": item['url'], "CATEGORIA": "SINGOLO"}])
+                    conn.update(data=pd.concat([df, new_row], ignore_index=True).drop_duplicates())
+                    st.success("AGGIUNTO!")
 
-else:
-    st.title("🎧 LA TUA DISCOTECA")
+# --- TAB 2: LIBRERIA (PLAYER SPOTIFY STYLE) ---
+with menu[1]:
     df = get_db()
-    if df.empty:
-        st.warning("CANTIERE VUOTO.")
+    if df.empty: st.warning("LA TUA LIBRERIA È VUOTA.")
     else:
+        if 'track_idx' not in st.session_state: st.session_state.track_idx = 0
         df_songs = df[df['CATEGORIA'] == "SINGOLO"]
+        
         if not df_songs.empty:
-            if st.session_state.track_idx >= len(df_songs): st.session_state.track_idx = 0
             curr = df_songs.iloc[st.session_state.track_idx]
-            
-            st.markdown(f"#### IN ONDA: {curr['TITOLO']}")
+            st.markdown(f"### 🎼 {curr['TITOLO']}")
             st.video(curr['URL'])
             
             c_p, c_n = st.columns(2)
-            if c_p.button("⏮ PRECEDENTE"):
+            if c_p.button("⏮ INDIETRO"):
                 st.session_state.track_idx = (st.session_state.track_idx - 1) % len(df_songs)
                 st.rerun()
-            if c_n.button("⏭ SUCCESSIVO"):
+            if c_n.button("⏭ AVANTI"):
                 st.session_state.track_idx = (st.session_state.track_idx + 1) % len(df_songs)
                 st.rerun()
 
-            st.write("---")
-            st.markdown("### 📥 SALVATAGGIO RAPIDO OFFLINE")
-            
-            for idx, row in df_songs.iterrows():
-                with st.expander(f"🎵 {row['TITOLO']}"):
-                    st.write("**1. CLICCA SULL'ICONA A DESTRA PER COPIARE IL LINK:**")
-                    # IL BOX CODE PERMETTE IL COPIA INCOLLA IMMEDIATO [cite: 2026-02-25]
-                    st.code(row['URL'], language="text")
-                    
-                    st.write("**2. APRI IL SITO E INCOLLA:**")
-                    notube_url = "https://notube.link/it/youtube-app-317"
-                    st.markdown(f'''
-                        <a href="{notube_url}" target="_blank">
-                            <button style="width:100%; height:50px; background-color:#007FFF; color:white; border-radius:30px; border:none; font-weight:bold; cursor:pointer;">
-                                🚀 APRI SALA INCISIONE (DOWNLOAD)
-                            </button>
-                        </a>
-                    ''', unsafe_allow_html=True)
-                    
-                    if st.button("❌ ELIMINA DALLA LISTA", key=f"del_{idx}"):
-                        conn.update(data=df.drop(index=idx))
-                        st.rerun()
+# --- TAB 3: DOWNLOAD (OFFLINE) ---
+with menu[2]:
+    st.markdown("### 📥 COPIA E SCARICA OFFLINE")
+    df = get_db()
+    for idx, row in df.iterrows():
+        with st.expander(f"🎵 {row['TITOLO']}"):
+            st.code(row['URL'], language="text")
+            st.markdown(f'<a href="https://notube.link/it/youtube-app-317?url={row["URL"]}" target="_blank"><button style="width:100%; height:45px; background-color:#007FFF; color:white; border-radius:10px; border:none; font-weight:bold;">🚀 SCARICA MP3</button></a>', unsafe_allow_html=True)
+            if st.button("❌ ELIMINA", key=f"del_{idx}"):
+                conn.update(data=df.drop(index=idx))
+                st.rerun()
