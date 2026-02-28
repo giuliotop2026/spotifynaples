@@ -2,3 +2,4 @@ streamlit
 yt-dlp>=2025.02.20
 st-gsheets-connection
 pandas
+ytmusicapi
